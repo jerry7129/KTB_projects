@@ -1,98 +1,62 @@
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        Human player = null;
+        ArrayList<Product> productList = new ArrayList<>();
 
-        while (player == null) {
-            System.out.println("========== 직업 선택 ==========");
-            System.out.println("1. 무직 (Human)");
-            System.out.println("2. 바바리안 (Barbarian)");
-            System.out.println("3. 기사 (Knight)");
-            System.out.println("4. 화염 마법사 (Fire Magician)");
-            System.out.println("5. 얼음 마법사 (Ice Magician)");
-            System.out.println("0. 프로그램 종료");
-            System.out.print("선택: ");
-
-            int choice = scanner.nextInt();
-            if (choice == 0) {
-                System.out.println("프로그램을 종료합니다.");
-                scanner.close();
-                return;
-            }
-
-            switch (choice) {
-                case 1: player = new Human(); break;
-                case 2: player = new Barbarian(); break;
-                case 3: player = new Knight(); break;
-                case 4: player = new FireMagician(); break;
-                case 5: player = new IceMagician(); break;
-                default: System.out.println("잘못된 입력입니다. 다시 선택해주세요.\n");
-            }
-        }
-
-        System.out.println("\n캐릭터가 생성되었습니다!");
-        player.status();
+        productList.add(new Laptop("L001", "맥북 프로 16", 3500000, 220, "M3 Max", "64GB"));
+        productList.add(new Smartphone("S001", "아이폰 15", 1250000, 110, "SKT", "010-1234-5678"));
+        productList.add(new Tshirt("T001", "오버핏 그래픽 티셔츠", 35000, "XL", "면 100%", "라운드 넥"));
+        productList.add(new Pants("P001", "와이드 데님 팬츠", 59000, "L", "데님", 105));
 
         while (true) {
-            System.out.println("\n========== 행동 선택 ==========");
-            System.out.println("1. 상태창 확인");
-            System.out.println("2. 일반 공격 (모든 직업 공통)");
-
-            if (player instanceof Warrior) {
-                System.out.println("3. 전사 기본 공격");
-            } else if (player instanceof Magician) {
-                System.out.println("3. 마법사 기본 공격");
-            }
-
-            if (player instanceof Barbarian) {
-                System.out.println("4. 도끼 공격 (바바리안 전용)");
-            } else if (player instanceof Knight) {
-                System.out.println("4. 대검 공격 (기사 전용)");
-            } else if (player instanceof FireMagician) {
-                System.out.println("4. 화염 마법 (화염 마법사 전용)");
-            } else if (player instanceof IceMagician) {
-                System.out.println("4. 얼음 마법 (얼음 마법사 전용)");
-            }
-
+            System.out.println("===== 쇼핑몰 관리 프로그램 =====");
+            System.out.println("1. 전체 상품 정보 보기");
+            System.out.println("2. 상품 일괄 구매");
+            System.out.println("3. 기기 특수 기능 실행");
             System.out.println("0. 프로그램 종료");
-            System.out.print("선택: ");
+            System.out.print("메뉴를 선택하세요: ");
 
-            int action = scanner.nextInt();
+            int choice = scanner.nextInt();
 
-            if (action == 0) {
+            if (choice == 0) {
                 System.out.println("프로그램을 종료합니다.");
                 break;
             }
 
-            System.out.println("------------------------------");
-            if (action == 1) {
-                player.status();
-            } else if (action == 2) {
-                player.normalAttack();
-            } else if (action == 3) {
-                if (player instanceof Warrior) {
-                    ((Warrior) player).normalSwordAttack();
-                } else if (player instanceof Magician) {
-                    ((Magician) player).normalMagicAttack();
-                } else {
-                    System.out.println("해당 직업은 사용할 수 없는 스킬입니다.");
-                }
-            } else if (action == 4) {
-                if (player instanceof Barbarian) {
-                    ((Barbarian) player).axeAttack();
-                } else if (player instanceof Knight) {
-                    ((Knight) player).greatSwordAttack();
-                } else if (player instanceof FireMagician) {
-                    ((FireMagician) player).fireMagicAttack();
-                } else if (player instanceof IceMagician) {
-                    ((IceMagician) player).iceMagicAttack();
-                } else {
-                    System.out.println("해당 직업은 사용할 수 없는 스킬입니다.");
-                }
-            } else {
-                System.out.println("잘못된 입력입니다.");
+            switch (choice) {
+                case 1:
+                    System.out.println("\n[전체 상품 정보 목록]");
+                    for (Product p : productList) {
+                        p.displayInfo();
+                        System.out.println("--------------------");
+                    }
+                    break;
+                case 2:
+                    System.out.println("\n[전체 상품 구매 처리]");
+                    for (Product p : productList) {
+                        p.buy();
+                    }
+                    System.out.println();
+                    break;
+                case 3:
+                    System.out.println("\n[기기 기능 실행]");
+                    for (Product p : productList) {
+                        if (p instanceof Electronics) {
+                            ((Electronics) p).powerOn();
+                            if (p instanceof Laptop) {
+                                ((Laptop) p).playGame();
+                            } else if (p instanceof Smartphone) {
+                                ((Smartphone) p).phoneCall();
+                            }
+                        }
+                    }
+                    System.out.println();
+                    break;
+                default:
+                    System.out.println("잘못된 입력입니다. 다시 선택해주세요.\n");
             }
         }
 
