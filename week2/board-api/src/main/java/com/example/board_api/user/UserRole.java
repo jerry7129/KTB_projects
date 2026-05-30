@@ -1,15 +1,15 @@
 package com.example.board_api.user;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public enum UserRole {
-    ADMIN("ROLE_ADMIN"),
-    USER("ROLE_USER");
+    USER(0,"USER"),
+    ADMIN(1, "ADMIN");
 
-    private String value;
+    private final int code;
+    private final String description;
 
-    UserRole(String value) {
-        this.value = value;
-    }
 }

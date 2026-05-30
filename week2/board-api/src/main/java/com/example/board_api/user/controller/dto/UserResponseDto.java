@@ -1,21 +1,25 @@
 package com.example.board_api.user.controller.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Getter;
 import com.example.board_api.user.domain.entity.User;
-import lombok.NoArgsConstructor;
 
 @Getter
-@NoArgsConstructor
+@JsonPropertyOrder({"userId", "email", "nickname", "profileImageURL", "createdAt", "updatedAt"})
 public class UserResponseDto {
-    private Long userId;
-    private String email;
-    private String nickname;
-    private String profileImage;
+    private final Long userId;
+    private final String email;
+    private final String nickname;
+    private final String profileImageURL;
+    private final String createdAt;
+    private final String updatedAt;
 
     public UserResponseDto(User user) {
         this.userId = user.getId();
         this.email = user.getEmail();
         this.nickname = user.getNickname();
-        this.profileImage = user.getProfileImage();
+        this.profileImageURL = user.getProfileImageURL();
+        this.createdAt = user.getCreatedAt().toString();
+        this.updatedAt = user.getUpdatedAt().toString();
     }
 }

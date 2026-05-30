@@ -2,11 +2,8 @@ package com.example.board_api.user.controller;
 
 import com.example.board_api.user.controller.dto.UserRequestDto;
 import com.example.board_api.user.controller.dto.UserResponseDto;
-import com.example.board_api.user.domain.entity.User;
-import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.service.UserService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
