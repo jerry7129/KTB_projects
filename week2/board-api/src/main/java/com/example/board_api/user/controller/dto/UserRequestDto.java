@@ -18,5 +18,9 @@ public class UserRequestDto {
     private String password;
     @NotBlank(message = "{user.nickname.not-blank}")
     private String nickname;
+//    @Pattern(
+//            regexp = "^.*\\.(jpg|jpeg|png|gif)$",
+//            message = "{user.profile-image.pattern}"
+//    )
     private String profileImageURL;
 }

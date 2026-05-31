@@ -5,6 +5,12 @@ spring:
     password: 030928
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 20MB
+
 #  jpa:
 #    hibernate:
 #      ddl-auto: create   # 개발 중에는 create / create-drop / update 중 선택
@@ -18,3 +24,6 @@ spring:
 
 server:
   port: 1234
+
+file:
+  upload-dir: /Users/ktb_ksg/IdeaProjects/KTB_projects/week2/ImageStorage

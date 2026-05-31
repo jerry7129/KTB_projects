@@ -1,10 +1,9 @@
-package com.example.board_api.exception.handler;
+package com.example.board_api.global.exception.handler;
 
-import com.example.board_api.ApiResponse;
-import com.example.board_api.exception.BusinessException;
-import com.example.board_api.exception.NotFoundException;
+import com.example.board_api.global.ApiResponse;
+import com.example.board_api.global.exception.BusinessException;
+import com.example.board_api.global.exception.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.Server;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;

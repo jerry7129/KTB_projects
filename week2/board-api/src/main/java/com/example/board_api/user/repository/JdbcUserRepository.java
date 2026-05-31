@@ -1,7 +1,7 @@
 package com.example.board_api.user.repository;
 
-import com.example.board_api.user.UserRole;
-import com.example.board_api.user.UserStatus;
+import com.example.board_api.user.domain.UserRole;
+import com.example.board_api.user.domain.UserStatus;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import org.springframework.beans.factory.annotation.Qualifier;

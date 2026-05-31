@@ -1,8 +1,7 @@
 package com.example.board_api.user.domain.entity;
 
-import com.example.board_api.user.UserRole;
-import com.example.board_api.user.UserStatus;
-import jakarta.persistence.*;
+import com.example.board_api.user.domain.UserRole;
+import com.example.board_api.user.domain.UserStatus;
 import lombok.*;
 
 import java.time.Instant;

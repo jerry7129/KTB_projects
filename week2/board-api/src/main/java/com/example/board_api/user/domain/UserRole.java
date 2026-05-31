@@ -1,4 +1,4 @@
-package com.example.board_api.user;
+package com.example.board_api.user.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

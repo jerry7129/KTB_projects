@@ -1,4 +1,4 @@
-package com.example.board_api;
+package com.example.board_api.global;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
