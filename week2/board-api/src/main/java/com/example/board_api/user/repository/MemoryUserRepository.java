@@ -54,4 +54,11 @@ public class MemoryUserRepository implements UserRepository {
                 .filter(member -> email.equals(member.getEmail()))
                 .findAny();
     }
+
+    @Override
+    public Optional<User> findByNickname(String nickname) {
+        return memoryDB.values().stream()
+                .filter(member -> nickname.equals(member.getEmail()))
+                .findAny();
+    }
 }
