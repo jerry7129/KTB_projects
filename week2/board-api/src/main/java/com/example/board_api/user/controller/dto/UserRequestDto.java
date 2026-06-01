@@ -9,14 +9,18 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class UserRequestDto {
-    @NotBlank(message = "이메일을 입력해야 합니다.")
+    @NotBlank(message = "{user.email.not-blank}")
     private String email;
-    @NotBlank(message = "비밀번호를 입력해야 합니다.")
-    @Size(min = 8, max = 20, message = "비밀번호는 8자 이상 20자 이하여야 합니다.")
-    @Pattern(regexp = "/^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*?_]).{8,20}$/;",
-            message = "대문자, 소문자, 숫자, 특수문자(!@#$%^&*?_)를 각각 최소 1개 포함해야 합니다.")
+    @NotBlank(message = "{user.password.not-blank}")
+    @Size(min = 8, max = 20, message = "{user.password.size}")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*?_]).{8,20}$",
+            message = "{user.password.pattern}")
     private String password;
-    @NotBlank(message = "닉네임을 입력해야 합니다.")
+    @NotBlank(message = "{user.nickname.not-blank}")
     private String nickname;
-    private String profileImage;
+//    @Pattern(
+//            regexp = "^.*\\.(jpg|jpeg|png|gif)$",
+//            message = "{user.profile-image.pattern}"
+//    )
+    private String profileImageURL;
 }

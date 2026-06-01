@@ -2,6 +2,7 @@ package com.example.board_api.user.repository;
 
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Repository
+@Qualifier("memoryRepo")
 // In-memory 데이터베이스
 public class MemoryUserRepository implements UserRepository {
     // key: sequence, value: user로 이뤄진 HashMap을 데이터베이스로 사용
@@ -50,6 +52,13 @@ public class MemoryUserRepository implements UserRepository {
         // 그 중 제일 먼저 찾은 것을 반환.
         return memoryDB.values().stream()
                 .filter(member -> email.equals(member.getEmail()))
+                .findAny();
+    }
+
+    @Override
+    public Optional<User> findByNickname(String nickname) {
+        return memoryDB.values().stream()
+                .filter(member -> nickname.equals(member.getEmail()))
                 .findAny();
     }
 }
