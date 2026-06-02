@@ -10,7 +10,7 @@ public class UserResponseDto {
     private final Long userId;
     private final String email;
     private final String nickname;
-    private final String profileImageURL;
+    private final String profileImageUrl;
     private final String createdAt;
     private final String updatedAt;
 
@@ -18,7 +18,7 @@ public class UserResponseDto {
         this.userId = user.getId();
         this.email = user.getEmail();
         this.nickname = user.getNickname();
-        this.profileImageURL = user.getProfileImageURL();
+        this.profileImageUrl = user.getProfileImageUrl();
         this.createdAt = user.getCreatedAt().toString();
         this.updatedAt = user.getUpdatedAt().toString();
     }

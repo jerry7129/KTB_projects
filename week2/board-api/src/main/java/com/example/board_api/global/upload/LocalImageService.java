@@ -13,11 +13,12 @@ import java.util.UUID;
 @Service
 public class LocalImageService implements ImageService {
 
+    // 로컬 저장소에 저장을 함.
     @Value("${file.upload-dir}")
     private String uploadDir;
 
     @Override
-    public String upload(MultipartFile file) {
+    public String upload(MultipartFile file, String directory) {
         // Image가 없다고 문제가 되지는 않음. 그냥 null을 리턴함.
         if(file == null || file.isEmpty()) {
             return null;
@@ -28,14 +29,16 @@ public class LocalImageService implements ImageService {
             String fileName = UUID.randomUUID().toString().replace("-", "")
                     + "_" + file.getOriginalFilename();
             // 파일을 저장할 위치 생성.
-            Path targetPath = Paths.get(uploadDir, fileName);
+            Path targetPath = Path.of(uploadDir).resolve(directory).resolve(fileName);
+
             // 생성할 디렉토리의 부모 디렉토리가 없을 경 자동 생성.
             Files.createDirectories(targetPath.getParent());
 
             File targetFile = targetPath.toFile();
             file.transferTo(targetFile);
 
-            return "/images/" + fileName;
+            String savedPath = Path.of("images", directory, fileName).toString();
+            return savedPath;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
