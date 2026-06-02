@@ -2,9 +2,11 @@ package com.example.board_api.global.upload;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
+
 public interface ImageService {
     // 이미지를 multi-part로 받아서 저장소에 저장 후 저장한 URL 주소를 반환
-    String upload(MultipartFile file);
+    String upload(MultipartFile file, String directory);
 
     // 저장소의 URL 주소에 있는 이미지를 제거
     void delete(String imageUrl);

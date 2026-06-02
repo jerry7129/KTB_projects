@@ -21,13 +21,23 @@ public class UserController {
     }
 
     @PostMapping
-    @Transactional
-    public ResponseEntity<ApiResponse<UserResponseDto>> createUser(
-            @Valid @RequestPart(value = "data") UserRequestDto requestDto,
+    public ResponseEntity<ApiResponse<UserResponseDto>> signUp(
+            @Valid @RequestPart(value = "data") UserRequestDto.SignUp requestDto,
             @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
             ) {
-        UserResponseDto responseDto = userService.signup(requestDto, profileImage);
+        UserResponseDto responseDto = userService.createUser(requestDto, profileImage);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.of("SUCCESS", "회원가입이 완료되었습니다.", responseDto));
+                .body(ApiResponse.of("SIGNUP_SUCCESS", "회원가입이 완료되었습니다.", responseDto));
+    }
+
+    @PatchMapping()
+    public ResponseEntity<ApiResponse<UserResponseDto>> updateUserInfo(
+            @RequestParam Long userId,
+            @Valid @RequestPart(value = "data") UserRequestDto.UpdateInfo requestDto,
+            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage
+            ) {
+        UserResponseDto responseDto = userService.updateUserInfo(userId, requestDto, profileImage);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.of("UPDATE_SUCCESS", "회원 정보 수정이 완료되었습니다.", responseDto));
     }
 }
