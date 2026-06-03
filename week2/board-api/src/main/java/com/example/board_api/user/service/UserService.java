@@ -1,6 +1,6 @@
 package com.example.board_api.user.service;
 
-import com.example.board_api.file.FileService;
+import com.example.board_api.global.util.file.FileService;
 import com.example.board_api.global.exception.BusinessException;
 import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.user.domain.UserRole;
@@ -10,13 +10,10 @@ import com.example.board_api.user.controller.dto.UserResponseDto;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.file.Path;
 
 // Service Layer는 직접적인 비즈니스 로직을 펼치지 않고
 // Domain과 Repository의 구현체를 컨트롤한다.

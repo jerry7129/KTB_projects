@@ -1,4 +1,4 @@
-package com.example.board_api.file;
+package com.example.board_api.global.util.file;
 
 import com.example.board_api.global.exception.BusinessException;
 import com.example.board_api.global.exception.InvalidFileException;
