@@ -103,6 +103,17 @@ public class UserService {
     }
 
     @Transactional
+    public void updateUserPassword(Long userId, UserRequestDto.UpdatePassword requestDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+
+        //비밀번호 암호화
+        String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
+
+        user.changePassword(encodedPassword);
+    }
+
+    @Transactional
     public void deleteUser(Long userId) {
         userRepository.deleteById(userId);
     }

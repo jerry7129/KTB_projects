@@ -19,20 +19,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+// @RestController와 @Controller의 차이
+// Controller는 String 반환 시, 이를 클라이언트에게 보여줄 HTML 파일 이름으로 해석함.
+// RestController는 순수하게 JSON만 반환함
+// 즉, RestController를 사용할 경우, redirection 구현은 안 하는게 맞음.
 
 @RestController
-@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
     // 로그인
-    @PostMapping
+    @PostMapping("/auth")
     public ResponseEntity<ApiResponse<LoginResponseDto>> login(
             @Valid @RequestBody LoginRequestDto loginRequestDto,
             HttpServletResponse httpResponse
@@ -55,5 +56,11 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.of("LOGIN_SUCCESS", "로그인을 성공했습니다.", result.getResponse()));
+    }
+
+    // 로그아웃
+    @DeleteMapping("/auth")
+    public void logout() {
+
     }
 }

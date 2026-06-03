@@ -13,7 +13,6 @@ public class UserRequestDto {
 
     // 회원가입 요청 Dto
     @Getter
-    @NoArgsConstructor
     public static class SignUp {
 
         @NotBlank(message = "{user.email.not-blank}")
@@ -38,7 +37,6 @@ public class UserRequestDto {
 
     // 회원 정보 수정 Dto ( 닉네임 필수, 프로필 사진 선택)
     @Getter
-    @NoArgsConstructor
     public static class UpdateInfo {
 
         @NotBlank(message = "{user.nickname.not-blank}")
@@ -52,6 +50,7 @@ public class UserRequestDto {
     }
 
     // 회원 비밀번호 수정 Dto
+    @Getter
     public static class UpdatePassword {
 
         @NotBlank(message = "{user.password.not-blank}")
