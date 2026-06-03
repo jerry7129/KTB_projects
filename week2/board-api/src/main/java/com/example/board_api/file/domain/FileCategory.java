@@ -1,21 +1,18 @@
-package com.example.board_api.user.domain;
+package com.example.board_api.file.domain;
 
-import com.example.board_api.file.domain.FileCategory;
 import com.example.board_api.global.util.converter.EnumMapperType;
 import com.example.board_api.global.util.converter.LegacyCodeConverter;
 import jakarta.persistence.Converter;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.util.Arrays;
-
 @Getter
 @AllArgsConstructor
-public enum UserRole implements EnumMapperType {
-    USER(0 ),
-    ADMIN(1 );
+public enum FileCategory implements EnumMapperType {
+    PROFILE_IMAGE(0 ),
+    POST_IMAGE(1 );
 
-    private final int legacyCode;
+    private final Integer legacyCode;
 
     @Override
     public Integer getLegacyCode() {
@@ -23,10 +20,10 @@ public enum UserRole implements EnumMapperType {
     }
 
     @Converter(autoApply = true)
-    public static class UserRoleConverter extends LegacyCodeConverter<UserRole> {
+    public static class FileCategoryConverter extends LegacyCodeConverter<FileCategory> {
 
-        public UserRoleConverter() {
-            super(UserRole.class);
+        public FileCategoryConverter() {
+            super(FileCategory.class);
         }
     }
 }

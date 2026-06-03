@@ -46,8 +46,8 @@ public class JdbcUserRepository {
             pstmt.setString(2, user.getEmail());
             pstmt.setString(3, user.getNickname());
             pstmt.setString(4, user.getProfileImageUrl());
-            pstmt.setInt(5, user.getRole().getCode());
-            pstmt.setInt(6, user.getStatus().getCode());
+            pstmt.setInt(5, user.getRole().getLegacyCode());
+            pstmt.setInt(6, user.getStatus().getLegacyCode());
             pstmt.setObject(7, user.getCreatedAt().atOffset(ZoneOffset.UTC));
             pstmt.setObject(8, user.getUpdatedAt().atOffset(ZoneOffset.UTC));
 
@@ -148,8 +148,8 @@ public class JdbcUserRepository {
                 .email(rs.getString("email"))
                 .nickname(rs.getString("nickname"))
                 .profileImageUrl(rs.getString("profile_image_url"))
-                .role(UserRole.fromCode(rs.getInt("role")))
-                .status(UserStatus.fromCode(rs.getInt("status")))
+//                .role(UserRole.fromCode(rs.getInt("role")))
+//                .status(UserStatus.fromCode(rs.getInt("status")))
                 .createdAt(rs.getTimestamp("created_at").toInstant())
                 .updatedAt(rs.getTimestamp("updated_at").toInstant())
                 .build();

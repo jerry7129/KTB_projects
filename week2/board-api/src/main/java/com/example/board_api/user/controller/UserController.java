@@ -7,6 +7,7 @@ import com.example.board_api.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,9 +31,9 @@ public class UserController {
                 .body(ApiResponse.of("SIGNUP_SUCCESS", "회원가입이 완료되었습니다.", responseDto));
     }
 
-    @PatchMapping()
+    @PatchMapping("/me")
     public ResponseEntity<ApiResponse<UserResponseDto>> updateUserInfo(
-            @RequestParam Long userId,
+            @AuthenticationPrincipal Long userId,
             @Valid @RequestPart(value = "data") UserRequestDto.UpdateInfo requestDto,
             @RequestParam(value = "profileImage", required = false) MultipartFile profileImage
             ) {

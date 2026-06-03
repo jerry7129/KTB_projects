@@ -33,8 +33,13 @@ public class User {
     @Column(nullable = false, unique = true)
     private String nickname;
 
-    private String profileImageUrl;
+    @Builder.Default
+    private String profileImageUrl = "/public/default-profile.png";
+
+    @Column(nullable = false, columnDefinition = "TINYINT")
     private UserRole role;
+
+    @Column(nullable = false, columnDefinition = "TINYINT")
     private UserStatus status;
 
     @CreatedDate

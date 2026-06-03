@@ -32,8 +32,9 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     private static final String[] PUBLIC_ENDPOINTS = {
-            "/users/**",
+            "/users",
             "/auth",
+            "/public/**"
     };
 
     @Bean

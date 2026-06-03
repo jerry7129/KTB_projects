@@ -1,6 +1,8 @@
 package com.example.board_api.global.config;
 
 import com.example.board_api.user.domain.UserRepository;
+import com.example.board_api.user.domain.UserRole;
+import com.example.board_api.user.domain.UserStatus;
 import com.example.board_api.user.domain.entity.User;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;
@@ -34,6 +36,8 @@ public class SeedConfig {
             User user = User.builder().nickname("tester" + i)
                             .email("tester" + i + "@adapterz.kr")
                             .password(password)
+                            .role(UserRole.USER)
+                            .status(UserStatus.ACTIVE)
                             .build();
             userRepository.save(user);
         });

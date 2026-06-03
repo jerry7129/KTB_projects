@@ -74,7 +74,7 @@ public class JwtProvider {
     }
 
     public boolean isAccessToken(String token) {
-        return "access".equals(parse(token).getPayload().get("typ", String.class));
+        return "access".equals(parse(token).getPayload().get("type", String.class));
     }
 
     public Long getUserId(String token) {
