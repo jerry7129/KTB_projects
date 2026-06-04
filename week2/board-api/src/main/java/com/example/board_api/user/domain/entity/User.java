@@ -1,5 +1,6 @@
 package com.example.board_api.user.domain.entity;
 
+import com.example.board_api.file.domain.entity.File;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
 import jakarta.persistence.*;
@@ -9,13 +10,15 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @EntityListeners(AuditingEntityListener.class)
 @Entity
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class User {
 
@@ -33,8 +36,8 @@ public class User {
     @Column(nullable = false, unique = true)
     private String nickname;
 
-    @Builder.Default
-    private String profileImageUrl = "/public/default-profile.png";
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<File> profileImage = new ArrayList<>();
 
     @Column(nullable = false, columnDefinition = "TINYINT")
     private UserRole role;
@@ -50,23 +53,33 @@ public class User {
     private Instant updatedAt;
 
     // User 정보 (닉네임, 프로필 사진 URL) 변경
-    public void changeUserInformation(String nickname, String profileImageUrl){
+    public void changeUserInformation(String nickname, File profileImage){
+        changeUserNickname(nickname);
+        changeProfileImage(profileImage);
+    }
+
+    // 닉네임 변경
+    public void changeUserNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
             throw new IllegalArgumentException("닉네임은 공백일 수 없습니다.");
         }
         this.nickname = nickname;
-        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
-            this.profileImageUrl = profileImageUrl;
-        }
     }
 
-    // 프로필 사진 URL 변경
-    public void changeProfileImageUrl(String profileImageUrl) {
-        this.profileImageUrl = profileImageUrl;
+    // 프로필 사진 변경
+    public void changeProfileImage(File profileImage) {
+        this.profileImage.add(profileImage);
     }
 
     // 비밀번호 변경
     public void changePassword(String password) {
         this.password = password;
+    }
+
+    public String getProfileImageUrl() {
+        if (this.profileImage == null) {
+            return "/public/profile/default-profile.png";
+        }
+        return "/public/" + this.getProfileImage().getLast().getFileKey();
     }
 }

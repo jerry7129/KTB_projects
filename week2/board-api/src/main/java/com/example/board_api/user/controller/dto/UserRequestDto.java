@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +14,7 @@ public class UserRequestDto {
 
     // 회원가입 요청 Dto
     @Getter
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     public static class SignUp {
 
         @NotBlank(message = "{user.email.not-blank}")
@@ -32,14 +34,21 @@ public class UserRequestDto {
                 regexp = "^.*\\.(jpg|jpeg|png|gif)$",
                 message = "{user.profile-image.pattern}"
         )
-        private String profileImageURL;
+
+        private String profileImageUrl;
     }
 
     // 회원 정보 수정 Dto ( 닉네임 필수, 프로필 사진 선택)
     @Getter
+    @NoArgsConstructor(access = AccessLevel.PROTECTED)
     public static class UpdateInfo {
 
         @NotBlank(message = "{user.nickname.not-blank}")
+        @Size(min = 8, max = 10, message = "{user.nickname.size}")
+        @Pattern(
+                regexp = "^[가-힣a-zA-Z0-9]+$",
+                message = "{user.nickname.pattern}"
+        )
         private String nickname;
 
         @Pattern(

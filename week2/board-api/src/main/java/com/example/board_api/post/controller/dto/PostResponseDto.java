@@ -17,6 +17,6 @@ public class PostResponseDto {
         postId = post.getId();
         postTitle = post.getTitle();
         postContent = post.getContent();
-        postImage = post.getImage();
+//        postImage = post.getImage();
     }
 }

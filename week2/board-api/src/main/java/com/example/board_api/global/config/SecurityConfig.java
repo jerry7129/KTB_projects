@@ -1,6 +1,6 @@
 package com.example.board_api.global.config;
 
-import com.example.board_api.auth.filter.JwtAuthenticationFilter;
+import com.example.board_api.global.filter.JwtAuthenticationFilter;
 import com.example.board_api.global.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -34,7 +34,9 @@ public class SecurityConfig {
     private static final String[] PUBLIC_ENDPOINTS = {
             "/users",
             "/auth",
-            "/public/**"
+            "/public/**",
+            "/users/temp-profile-image"
+
     };
 
     @Bean

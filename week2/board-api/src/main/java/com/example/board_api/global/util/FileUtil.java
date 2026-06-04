@@ -1,4 +1,4 @@
-package com.example.board_api.global.util.file;
+package com.example.board_api.global.util;
 
 import com.example.board_api.global.exception.BusinessException;
 import org.springframework.http.HttpStatus;

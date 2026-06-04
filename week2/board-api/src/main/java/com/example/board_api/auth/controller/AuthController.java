@@ -3,14 +3,8 @@ package com.example.board_api.auth.controller;
 import com.example.board_api.auth.controller.dto.LoginRequestDto;
 import com.example.board_api.auth.controller.dto.LoginResponseDto;
 import com.example.board_api.auth.controller.dto.LoginResultDto;
-import com.example.board_api.auth.domain.RefreshTokenRepository;
-import com.example.board_api.auth.repository.JwtProvider;
 import com.example.board_api.auth.service.AuthService;
 import com.example.board_api.global.ApiResponse;
-import com.example.board_api.user.controller.dto.UserRequestDto;
-import com.example.board_api.user.controller.dto.UserResponseDto;
-import com.example.board_api.user.repository.JdbcUserRepository;
-import com.example.board_api.user.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +12,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 // @RestController와 @Controller의 차이

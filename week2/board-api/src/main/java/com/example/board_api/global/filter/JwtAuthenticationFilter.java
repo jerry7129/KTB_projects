@@ -1,4 +1,4 @@
-package com.example.board_api.auth.filter;
+package com.example.board_api.global.filter;
 
 import com.example.board_api.auth.repository.JwtProvider;
 import jakarta.servlet.FilterChain;
