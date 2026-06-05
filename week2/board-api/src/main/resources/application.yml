@@ -37,4 +37,4 @@ file:
 jwt:
   secret: G5KqZvoFdwznjSmV/bfotdex9dgsTSwKB4iVb9Jd7Ey8RbAnub58E0RMkHSDXsmkJQ4Q6W/r/8ICMXCulnLxdw==
   access-token-exp-seconds: 300
-  refresh-token-exp-seconds: 12096000
+  refresh-token-exp-seconds: 1209600

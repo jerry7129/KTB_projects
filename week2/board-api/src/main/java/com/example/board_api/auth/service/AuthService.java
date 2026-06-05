@@ -93,4 +93,11 @@ public class AuthService {
                 newRefreshToken
         );
     }
+
+    public void logout(String refreshToken) {
+        if (refreshToken != null) {
+            refreshTokenRepository.findByToken(refreshToken)
+                    .ifPresent(refreshTokenRepository::delete);
+        }
+    }
 }
