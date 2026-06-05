@@ -1,5 +1,6 @@
 package com.example.board_api.user.service;
 
+import com.example.board_api.auth.domain.RefreshTokenRepository;
 import com.example.board_api.file.domain.ProfileImageRepository;
 import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.file.service.FileService;
@@ -37,6 +38,7 @@ public class UserService {
     private final FileService fileService;
     private final ProfileImageRepository profileImageRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 회원 가입 로직
     @Transactional
@@ -151,10 +153,13 @@ public class UserService {
         List<String> targetImageKeys = userQueryRepository.findByUserIdWidthAllImageKeys(userId);
         // 각 이미지 키를 바탕으로 실제 물리 파일을 삭제
         // 현재 로컬 디스크에 저장하는 경우 파일 삭제는 잘 되지만, 파일 경로에 생긴 폴더는 삭제가 안됨.
-        // 향후에 해결 예정
+        // 향후에 해결 예결
         for(String fileKey : targetImageKeys) {
             fileService.delete(fileKey);
         }
+
+        // 사용자의 refresh_token 삭제
+        refreshTokenRepository.deleteByUserId(userId);
 
         // DB table에서 유저와 연관된 데이터를 일괄 삭제함.
         userQueryRepository.deleteByIdWithProfileImageWithPost(userId);
