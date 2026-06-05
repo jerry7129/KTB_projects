@@ -37,8 +37,10 @@ public class User {
     private String nickname;
 
     @Builder.Default
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    private List<ProfileImage> profileImage = new ArrayList<>();
+    // CascadeType.ALL -> 부모 entity가 삭제될 경우 자식도 모두 삭제함.
+    // orphanRemoval -> 자식 entity를 부모 List에서 제거할 경우 (고아 상태) DB에서도 삭제
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfileImage> profileImages = new ArrayList<>();
 
     @Column(nullable = false, columnDefinition = "TINYINT")
     private UserRole role;
@@ -67,20 +69,31 @@ public class User {
         this.nickname = nickname;
     }
 
-    // 프로필 사진 변경
-    public void changeProfileImage(ProfileImage profileImage) {
-        this.profileImage.add(profileImage);
-    }
-
     // 비밀번호 변경
     public void changePassword(String password) {
         this.password = password;
     }
 
     public String getProfileImageUrl() {
-        if (this.profileImage == null) {
+        if (this.profileImages == null) {
             return "/public/profile/default-profile.png";
         }
-        return "/public/" + this.getProfileImage().getLast().getFileKey();
+        return "/public/" + this.getProfileImages().getLast().getFileKey();
+    }
+
+    // ============ 연관 관계 편의 메소드 ===========
+    // 프로필 사진 변경
+    public void changeProfileImage(ProfileImage profileImage) {
+        this.profileImages.clear(); // 기존 이미지 참조 해제 (orphanRemoval에 의해 DB에서 삭제됨)
+        if (profileImage != null) {
+            profileImage.setUser(this);
+            this.profileImages.add(profileImage);
+        }
+    }
+
+    // 프로필 사진 추가
+    public void addProfileImage(ProfileImage profileImage) {
+        profileImage.setUser(this);
+        this.profileImages.add(profileImage);
     }
 }

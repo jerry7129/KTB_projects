@@ -16,31 +16,25 @@ public class ProfileImage {
     @Column(name = "image_id")
     private Long id;
 
-    @Column(name = "user_id")
-    private Long userId;
-
     // Foreign Key를 갖고있는 곳에서 선언해야 함.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @Column(nullable = false, name = "image_key")
     private String fileKey = "profile/default-profile.png";
 
-    // Constructor
-    public ProfileImage(String fileKey, Long userId) {
+    public ProfileImage(String fileKey) {
         this.fileKey = fileKey;
-        this.userId = userId;
-    }
-
-    // Factory Methods
-    public static ProfileImage createProfileImage(String fileKey, Long userId) {
-        return new ProfileImage(fileKey, userId);
     }
 
     // 회원가입 시, 이미지 저장을 temp 디렉토리에 임시로 저장한 뒤에 회원가입 완료 후 경로를 바꾸기 위함.
-    public void updateFileKeyAndUserId(String fileKey, Long userId) {
+    public void updateFileKeyAndUserId(String fileKey) {
         this.fileKey = fileKey;
-        this.userId = userId;
+    }
+
+    // 연관 관계 편의 메소드를 위한 메소드
+    public void setUser(User user) {
+        this.user = user;
     }
 }

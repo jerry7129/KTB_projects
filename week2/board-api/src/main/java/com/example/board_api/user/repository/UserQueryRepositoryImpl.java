@@ -2,12 +2,18 @@ package com.example.board_api.user.repository;
 
 import com.example.board_api.user.domain.UserQueryRepository;
 import com.example.board_api.user.domain.entity.User;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
+import static com.example.board_api.file.domain.entity.QPostImage.postImage;
+import static com.example.board_api.file.domain.entity.QProfileImage.profileImage;
+import static com.example.board_api.post.domain.entity.QPost.post;
 import static com.example.board_api.user.domain.entity.QUser.user;
 
 @Repository
@@ -21,7 +27,7 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
         return Optional.ofNullable(
                 queryFactory
                         .selectFrom(user)
-                        .leftJoin(user.profileImage).fetchJoin()
+                        .leftJoin(user.profileImages).fetchJoin()
                         .where(user.email.eq(email))
                         .fetchOne()
         );
@@ -32,9 +38,64 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
         return Optional.ofNullable(
                 queryFactory
                         .selectFrom(user)
-                        .leftJoin(user.profileImage).fetchJoin()
+                        .leftJoin(user.profileImages).fetchJoin()
                         .where(user.id.eq(id))
                         .fetchOne()
         );
+    }
+
+    // 특정 유저의 프로필 사진과 유저가 작성한 게시글에 있는 사진들의 키를 모두 조회하는 쿼리.
+    @Override
+    public List<String> findByUserIdWidthAllImageKeys(Long userId) {
+
+        // 프로필 이미지 키 조회.
+        List<String> profileKeys = queryFactory
+                .select(profileImage.fileKey)
+                .from(profileImage)
+                .where(profileImage.user.id.eq(userId))
+                .fetch();
+
+        // 유저가 작성한 게시글의 이미지 키 조회.
+        List<String> postKeys = queryFactory
+                .select(postImage.fileKey)
+                .from(postImage)
+                .join(postImage.post, post)
+                .where(post.writerId.eq(userId))
+                .fetch();
+
+        // 두 리스트 합쳐서 리턴.
+        List<String> allKeys = new ArrayList<>();
+        allKeys.addAll(profileKeys);
+        allKeys.addAll(postKeys);
+        return allKeys;
+    }
+
+
+    @Override
+    public void deleteByIdWithProfileImageWithPost(Long id) {
+        // 유저 프로필 사진 삭제
+        queryFactory.delete(profileImage)
+                .where(profileImage.user.id.eq(id))
+                .execute();
+
+        // 유저가 작성한 게시글의 이미지 삭제
+        queryFactory.delete(postImage)
+                .where(postImage.post.id.in(
+                        // JPQL은 DELETE 문에서 직접 JOIN을 쓸 수 없어서 서브 쿼리 생성.
+                        JPAExpressions.select(post.id)
+                                .from(post)
+                                .where(post.writerId.eq(id))
+                ))
+                .execute();
+
+        // 유저가 작성한 게시글 삭제
+        queryFactory.delete(post)
+                .where(post.writerId.eq(id))
+                .execute();
+
+        // 유저 삭제
+        queryFactory.delete(user)
+                .where(user.id.eq(id))
+                .execute();
     }
 }

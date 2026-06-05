@@ -43,6 +43,15 @@ public class UserController {
                 .body(ApiResponse.of("UPDATE_SUCCESS", "회원 정보 수정이 완료되었습니다.", responseDto));
     }
 
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> deleteUserInfo(
+            @AuthenticationPrincipal Long userId
+    ) {
+        userService.deleteUser(userId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(ApiResponse.of("DELETE_SUCCESS", "회원 탈퇴가 완료되었습니다.", null));
+    }
+
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> updateUserPassword(
             @AuthenticationPrincipal Long userId,

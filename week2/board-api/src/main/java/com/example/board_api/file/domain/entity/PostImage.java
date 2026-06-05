@@ -18,26 +18,21 @@ public class PostImage {
     @Column(name = "image_id")
     private Long id;
 
-    @Column(name = "post_id")
-    private Long postId;
-
     // Foreign Key를 갖고있는 곳에서 선언해야 함.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", insertable = false, updatable = false)
+    @JoinColumn(name = "post_id")
     private Post post;
 
     @Column(nullable = false, name = "image_key")
     private String fileKey = "profile/default-profile.png";
 
-    // Constructor
-    public PostImage(String fileKey, Long postId) {
+    public PostImage(String fileKey) {
         this.fileKey = fileKey;
-        this.postId = postId;
     }
 
-    // Factory Methods
-    public static PostImage createPostImage(String fileKey, Long postId) {
-        return new PostImage(fileKey, postId);
+    // 연관 관계 편의 메소드
+    public void setPost(Post post) {
+        this.post = post;
     }
 
 }

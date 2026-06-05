@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 // Service Layer는 직접적인 비즈니스 로직을 펼치지 않고
@@ -61,7 +62,7 @@ public class UserService {
 
         // POST /users/temp-profile-image 요청을 통해 얻은 임시 저장소 URL을 바탕으로
         // POST /users 로 유저 생성 이후에 임시 저장소의 프로필 이미지를 profile/{userId}/{fileName} 으로 옮김.
-        // dirty checking 으로 유저 엔티티 변동이 자동으로 DB 반영됨
+        // dirty check 로 유저 엔티티 변동이 자동으로 DB 반영됨
         if (request.getProfileImageUrl() != null
                 && !request.getProfileImageUrl().isBlank()
                 // 프로필 이미지가 default-profile.png 로 설정되어 있어도 무시.
@@ -81,6 +82,9 @@ public class UserService {
         return UserInfoResponseDto.from(user);
     }
 
+    // 유저의 닉네임 또는 프로필 이미지를 변경하는 함수
+    // 프로필 이미지 업데이트의 경우,
+    // 1. 디스크의 물리 이미지 삭제 -> 2. 새로운 이미지 업로드
     @Transactional
     public UserInfoResponseDto updateUserInfo(
             Long userId,
@@ -96,13 +100,22 @@ public class UserService {
             throw new BusinessException("USER_NICKNAME_CONFLICT", "중복된 닉네임 입니다.", HttpStatus.CONFLICT);
         }
 
-        // 이미지를 disk에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
-        // 저장 후, 저장 위치 URL을 return함. 주소가 없을 경우 default 주소를 return함.
-        String oldFileKey = user.getProfileImage().isEmpty() ? null : user.getProfileImage().getLast().getFileKey();
-        ProfileImage newImage = fileService.updateProfileImage(oldFileKey, profileImage, user.getId());
+        // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
+        // 변경 시, 기존에 가지고 있던 모든 프로필 이미지의 물리 파일을 삭제. (고아 파일 방지)
+        if (user.getProfileImages() != null && !user.getProfileImages().isEmpty()) {
+            for (ProfileImage oldImage : user.getProfileImages()) {
+                fileService.delete(oldImage.getFileKey());
+            }
+        }
 
-        // JPA의 Dirty Check를 사용. 객체를 수정하기만 해도 Transaction 종료 후에 자동으로 DB에 commit 됨.
-        // 이때 profileImage가 빈 값이면 imageUrl은 null이 되고, user의 프로필 사진 주소는 변경되지 않는다.
+        ProfileImage newImage = null;
+        if (profileImage != null && !profileImage.isEmpty()) {
+            // update할 profileImage를 /uploads/{userId} 에 업로드
+            newImage = fileService.uploadProfileImage(profileImage, user.getId());
+        }
+
+        // JPA의 dirty check를 사용. Transaction 종료 후에 자동으로 DB에 commit 됨.
+        // changeUserInformation 안에서 profileImages.clear()가 호출되어 기존 DB 데이터가 고아 객체로 지워짐.
         user.changeUserInformation(requestDto.getNickname(), newImage);
         return UserInfoResponseDto.from(user);
     }
@@ -134,7 +147,17 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long userId) {
-        userRepository.deleteById(userId);
+        // 일단 삭제하려는 유저와 연관된 이미지(프로필 사진, 유저가 작성한 게시글의 이미지)의 이미지 키 리스트를 조회
+        List<String> targetImageKeys = userQueryRepository.findByUserIdWidthAllImageKeys(userId);
+        // 각 이미지 키를 바탕으로 실제 물리 파일을 삭제
+        // 현재 로컬 디스크에 저장하는 경우 파일 삭제는 잘 되지만, 파일 경로에 생긴 폴더는 삭제가 안됨.
+        // 향후에 해결 예정
+        for(String fileKey : targetImageKeys) {
+            fileService.delete(fileKey);
+        }
+
+        // DB table에서 유저와 연관된 데이터를 일괄 삭제함.
+        userQueryRepository.deleteByIdWithProfileImageWithPost(userId);
     }
 
 
@@ -148,7 +171,7 @@ public class UserService {
         String relativePath = FileUtil.extractPathFromUrl(profileImageUrl);
         String fileKey = relativePath.replaceFirst("^/?public/", "");
 
-        // 2. 추출된 상대 경로로 DB 조회 -> 키로 바꿔야함.
+        // 2. 추출된 상대 경로로 DB 조회 -> 키로 바꿈.
         return profileImageRepository.findByFileKey(fileKey)
                 .orElseThrow(() -> new NotFoundException("PROFILE_IMAGE_NOT_FOUND"));
     }

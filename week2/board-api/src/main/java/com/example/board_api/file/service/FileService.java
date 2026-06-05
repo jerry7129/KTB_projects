@@ -22,8 +22,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
-import static com.example.board_api.file.domain.entity.ProfileImage.createProfileImage;
-
 @Slf4j
 @Service
 public class FileService {
@@ -45,7 +43,9 @@ public class FileService {
 
     public ProfileImage uploadTempProfileImage(MultipartFile file) {
         // 회원가입 전에는 userId가 없으므로 temp 디렉토리에 임시로 프로필 사진을 저장함.
-        return uploadFile(file, "temp", null);
+        ProfileImage tempImage = uploadFile(file, "temp", null);
+        // 임시 파일의 경우 연관된 User가 없기 때문에, 수동으로 Repository에 접근함.
+        return profileImageRepository.save(tempImage);
     }
 
     public ProfileImage uploadFile(MultipartFile file, String prefix, Long id) {
@@ -80,12 +80,16 @@ public class FileService {
         String fileKey = prefix + "/";
         if (id != null) { fileKey += id + "/"; } // 역시 id가 null 일 때 예외 처리.
         fileKey += filename; // 일반적인 경우 /profile/{userId}/{filename}, 임시의 경우 /tmp/{filename}
-        return profileImageRepository.save(ProfileImage.createProfileImage(fileKey, id));
+
+        // 연관 관계 편의 메소드를 통해 User에 ProfileImage를 추가함으로써
+        // 자동으로 ProfileImage DB table에 값을 저장하도록 유도함.
+        // 그래서 여기서 ProfileImageRepository.save()를 호출 안 함.
+        return new ProfileImage(fileKey);
     }
 
     public void delete(String fileKey) {
         if (fileKey == null || fileKey.isBlank()) return;
-        if (fileKey.equals("/images/default-profile.png")) return;
+        if (fileKey.equals("profile/default-profile.png")) return;
 
         try {
             // /public/profile/{userId}/{fileName} -> {userId}/{fileName} 상대 경로 변환 과정.
@@ -154,7 +158,7 @@ public class FileService {
         }
         // DB 엔티티 정보 업데이트
         String imageKey = newDirectory + "/" + oldPath.getFileName().toString();
-        file.updateFileKeyAndUserId(imageKey, userId);
+        file.updateFileKeyAndUserId(imageKey);
 
         // JPA의 영속성 컨텍스트 변경 감지(Dirty Checking)로 자동 업데이트 됩니다.
         return file;

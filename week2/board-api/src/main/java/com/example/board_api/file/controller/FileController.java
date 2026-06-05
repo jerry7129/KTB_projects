@@ -48,7 +48,7 @@ public class FileController {
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.of(
                         "PROFILE_IMAGE_UPLOADED",
-                        "회원 가입을 위한 프로필 이미지가 업로드 되었습니다.",
+                        "프로필 수정을 위한 프로필 이미지가 업로드 되었습니다.",
                         ProfileImageUploadResponseDto.from(savedFile)
                 ));
     }
