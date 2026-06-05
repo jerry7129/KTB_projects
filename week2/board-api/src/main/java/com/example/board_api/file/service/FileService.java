@@ -1,12 +1,13 @@
 package com.example.board_api.file.service;
 
-import com.example.board_api.file.domain.FileRepository;
-import com.example.board_api.file.domain.entity.File;
+import com.example.board_api.file.domain.ProfileImageRepository;
+import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.global.exception.BusinessException;
 import com.example.board_api.global.exception.InvalidFileException;
 import com.example.board_api.global.util.FileUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
-import static com.example.board_api.file.domain.entity.File.createProfileImage;
+import static com.example.board_api.file.domain.entity.ProfileImage.createProfileImage;
 
 @Slf4j
 @Service
@@ -32,22 +33,22 @@ public class FileService {
     private static final Path FILE_DIR = PROJECT_ROOT.resolve("uploads");  // 프로필 이미지 저장 디렉토리
     private static final String FILE_URL = "/public";    // 클라이언트 접근 URL
     private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif"); // 허용할 확장자 목록
-    private final FileRepository fileRepository;
+    private static ProfileImageRepository profileImageRepository;
 
-    public FileService(FileRepository fileRepository) {
-        this.fileRepository = fileRepository;
+    public FileService(ProfileImageRepository profileImageRepository) {
+        this.profileImageRepository = profileImageRepository;
     }
 
-    public File uploadProfileImage(MultipartFile file, Long userId) {
+    public ProfileImage uploadProfileImage(MultipartFile file, Long userId) {
         return uploadFile(file, "profile", userId);
     }
 
-    public File uploadTempProfileImage(MultipartFile file) {
+    public ProfileImage uploadTempProfileImage(MultipartFile file) {
         // 회원가입 전에는 userId가 없으므로 temp 디렉토리에 임시로 프로필 사진을 저장함.
         return uploadFile(file, "temp", null);
     }
 
-    public File uploadFile(MultipartFile file, String prefix, Long id) {
+    public ProfileImage uploadFile(MultipartFile file, String prefix, Long id) {
         // prefix 맨 앞에 "/"를 붙여보내는 실수를 할 경우를 방지 하기 위한 방어 코드. (본인이 실수 함)
         if(prefix.startsWith("/")){
             prefix = prefix.substring(1);
@@ -79,7 +80,7 @@ public class FileService {
         String fileKey = prefix + "/";
         if (id != null) { fileKey += id + "/"; } // 역시 id가 null 일 때 예외 처리.
         fileKey += filename; // 일반적인 경우 /profile/{userId}/{filename}, 임시의 경우 /tmp/{filename}
-        return fileRepository.save(File.createProfileImage(fileKey, id));
+        return profileImageRepository.save(ProfileImage.createProfileImage(fileKey, id));
     }
 
     public void delete(String fileKey) {
@@ -109,10 +110,10 @@ public class FileService {
 
     }
 
-    public File updateProfileImage(String oldImageUrl, MultipartFile newFile, Long userId) {
+    public ProfileImage updateProfileImage(String oldImageUrl, MultipartFile newFile, Long userId) {
         return update(oldImageUrl, newFile, "profile", userId);
     }
-    public File update(String oldImageUrl, MultipartFile newFile, String prefix, Long id) {
+    public ProfileImage update(String oldImageUrl, MultipartFile newFile, String prefix, Long id) {
         delete(oldImageUrl);
 
         if (newFile == null || newFile.isEmpty()) {
@@ -122,7 +123,7 @@ public class FileService {
     }
 
     // 회원가입 전 임시로 저장한 파일의 디렉토리를 /profile/{userId}로 변경함.
-    public File moveTempToProfile(String tempImageUrl, Long userId) {
+    public ProfileImage moveTempToProfile(String tempImageUrl, Long userId) {
         if (tempImageUrl == null || tempImageUrl.isBlank()) return null;
 
         // DB에서 임시 프로필 이미지 있는 지 찾기
@@ -130,7 +131,7 @@ public class FileService {
         String extractedPath = FileUtil.extractPathFromUrl(tempImageUrl);
         String fileKey = extractedPath.replaceFirst("^/?public/", "");
 
-        File file = fileRepository.findByFileKey(fileKey)
+        ProfileImage file = profileImageRepository.findByFileKey(fileKey)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
         // 로컬 저장소의 현재 임시 프로필 이미지 저장 경로 계산

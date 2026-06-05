@@ -30,7 +30,7 @@ public class SeedConfig {
 
     @Transactional
     void seed() {
-        if (userRepository.count() >= 10) return;
+        if (userRepository.count() >= 0) return;
         IntStream.rangeClosed(1, 10).forEach(i -> {
             String password = "12341234aS!" + i;
             User user = User.builder().nickname("tester" + i)

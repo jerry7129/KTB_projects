@@ -1,7 +1,7 @@
 package com.example.board_api.user.service;
 
-import com.example.board_api.file.domain.FileRepository;
-import com.example.board_api.file.domain.entity.File;
+import com.example.board_api.file.domain.ProfileImageRepository;
+import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.file.service.FileService;
 import com.example.board_api.global.exception.BusinessException;
 import com.example.board_api.global.exception.NotFoundException;
@@ -34,7 +34,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserQueryRepository userQueryRepository;
     private final FileService fileService;
-    private final FileRepository fileRepository;
+    private final ProfileImageRepository profileImageRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 회원 가입 로직
@@ -66,7 +66,7 @@ public class UserService {
                 && !request.getProfileImageUrl().isBlank()
                 // 프로필 이미지가 default-profile.png 로 설정되어 있어도 무시.
                 && !request.getProfileImageUrl().contains("default-profile.png")) {
-            File movedFile = fileService.moveTempToProfile(request.getProfileImageUrl(), savedUser.getId());
+            ProfileImage movedFile = fileService.moveTempToProfile(request.getProfileImageUrl(), savedUser.getId());
             savedUser.changeProfileImage(movedFile); // 유저 엔티티에 프로필 연결
         }
 
@@ -99,7 +99,7 @@ public class UserService {
         // 이미지를 disk에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
         // 저장 후, 저장 위치 URL을 return함. 주소가 없을 경우 default 주소를 return함.
         String oldFileKey = user.getProfileImage().isEmpty() ? null : user.getProfileImage().getLast().getFileKey();
-        File newImage = fileService.updateProfileImage(oldFileKey, profileImage, user.getId());
+        ProfileImage newImage = fileService.updateProfileImage(oldFileKey, profileImage, user.getId());
 
         // JPA의 Dirty Check를 사용. 객체를 수정하기만 해도 Transaction 종료 후에 자동으로 DB에 commit 됨.
         // 이때 profileImage가 빈 값이면 imageUrl은 null이 되고, user의 프로필 사진 주소는 변경되지 않는다.
@@ -139,7 +139,7 @@ public class UserService {
 
 
     // ========== Private Methods ==========
-    private File resolveProfileImage(String profileImageUrl) {
+    private ProfileImage resolveProfileImage(String profileImageUrl) {
         if (profileImageUrl == null || profileImageUrl.isBlank()) {
             return null;
         }
@@ -149,7 +149,7 @@ public class UserService {
         String fileKey = relativePath.replaceFirst("^/?public/", "");
 
         // 2. 추출된 상대 경로로 DB 조회 -> 키로 바꿔야함.
-        return fileRepository.findByFileKey(fileKey)
+        return profileImageRepository.findByFileKey(fileKey)
                 .orElseThrow(() -> new NotFoundException("PROFILE_IMAGE_NOT_FOUND"));
     }
 }

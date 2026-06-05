@@ -1,6 +1,6 @@
 package com.example.board_api.post.domain.entity;
 
-import com.example.board_api.file.domain.entity.File;
+import com.example.board_api.file.domain.entity.PostImage;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,7 +24,7 @@ public class Post {
     private String content;
 
     @OneToMany(mappedBy = "post", fetch = FetchType.LAZY)
-    private List<File> image = new ArrayList<>();
+    private List<PostImage> image = new ArrayList<>();
 
     // Domain-Driven Design에서 서로 다른 Domain의 Entity를 직접 참조하는 것을 지양한다.
     // 그래서 게시글의 작성자인 User의 id를 authorId에 저장해둔다.

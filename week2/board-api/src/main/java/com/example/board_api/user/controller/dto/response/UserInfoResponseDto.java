@@ -1,6 +1,4 @@
 package com.example.board_api.user.controller.dto.response;
-
-import com.example.board_api.file.domain.entity.File;
 import com.example.board_api.global.util.FileUtil;
 import com.example.board_api.user.domain.entity.User;
 

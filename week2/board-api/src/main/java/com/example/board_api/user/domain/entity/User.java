@@ -1,6 +1,6 @@
 package com.example.board_api.user.domain.entity;
 
-import com.example.board_api.file.domain.entity.File;
+import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
 import jakarta.persistence.*;
@@ -36,8 +36,9 @@ public class User {
     @Column(nullable = false, unique = true)
     private String nickname;
 
+    @Builder.Default
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    private List<File> profileImage = new ArrayList<>();
+    private List<ProfileImage> profileImage = new ArrayList<>();
 
     @Column(nullable = false, columnDefinition = "TINYINT")
     private UserRole role;
@@ -53,7 +54,7 @@ public class User {
     private Instant updatedAt;
 
     // User 정보 (닉네임, 프로필 사진 URL) 변경
-    public void changeUserInformation(String nickname, File profileImage){
+    public void changeUserInformation(String nickname, ProfileImage profileImage){
         changeUserNickname(nickname);
         changeProfileImage(profileImage);
     }
@@ -67,7 +68,7 @@ public class User {
     }
 
     // 프로필 사진 변경
-    public void changeProfileImage(File profileImage) {
+    public void changeProfileImage(ProfileImage profileImage) {
         this.profileImage.add(profileImage);
     }
 

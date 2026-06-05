@@ -28,6 +28,11 @@ public class UserRequestDto {
         private String password;
 
         @NotBlank(message = "{user.nickname.not-blank}")
+        @Size(min = 2, max = 10, message = "{user.nickname.size}")
+        @Pattern(
+                regexp = "^[가-힣a-zA-Z0-9]+$",
+                message = "{user.nickname.pattern}"
+        )
         private String nickname;
 
         @Pattern(
@@ -44,7 +49,7 @@ public class UserRequestDto {
     public static class UpdateInfo {
 
         @NotBlank(message = "{user.nickname.not-blank}")
-        @Size(min = 8, max = 10, message = "{user.nickname.size}")
+        @Size(min = 2, max = 10, message = "{user.nickname.size}")
         @Pattern(
                 regexp = "^[가-힣a-zA-Z0-9]+$",
                 message = "{user.nickname.pattern}"
