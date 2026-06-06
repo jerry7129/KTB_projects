@@ -80,11 +80,12 @@ public class User {
         this.password = password;
     }
 
+    // 프로필 이미지 Uri 가져오기
     public String getProfileImageUris() {
         if (this.profileImages == null) {
             return "/public/profile/default-profile.png";
         }
-        return "/public/" + this.getProfileImages().get(0).getFileKey();
+        return "/public/" + this.getProfileImages().getLast().getFileKey();
     }
 
     // ============ 연관 관계 편의 메소드 ===========

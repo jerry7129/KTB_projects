@@ -3,18 +3,22 @@ package com.example.board_api.post.service;
 import com.example.board_api.file.domain.entity.PostImage;
 import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.file.service.FileService;
+import com.example.board_api.global.exception.AuthorizedException;
 import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.post.controller.dto.PostRequestDto;
 import com.example.board_api.post.controller.dto.PostResponseDto;
 import com.example.board_api.post.domain.PostRepository;
 import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.post.domain.entity.PostStatus;
+import com.example.board_api.user.controller.dto.response.UserInfoResponseDto;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Validated
@@ -62,7 +66,57 @@ public class PostService {
     }
 
     @Transactional
-    public PostResponseDto updatePost(Long writerId, PostRequestDto requestDto) {
-        return null;
+    public PostResponseDto updatePostInfo(
+            Long writerId, Long postId,
+            PostRequestDto requestDto, MultipartFile postImage
+    ) {
+        Post post = getPostWithAuthorization(postId, writerId);
+
+        // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
+        // 변경 시, 기존에 가지고 있던 모든 프로필 이미지의 물리 파일을 삭제. (고아 파일 방지)
+        if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
+            for (PostImage oldImage : post.getPostImages()) {
+                fileService.delete(oldImage.getFileKey());
+            }
+        }
+
+        PostImage newImage = null;
+        if (postImage != null && !postImage.isEmpty()) {
+            // update할 postImage를 /uploads/{postId} 에 업로드
+            newImage = fileService.uploadPostImage(postImage, post.getId());
+        }
+
+        // JPA의 dirty check를 사용. Transaction 종료 후에 자동으로 DB에 commit 됨.
+        // changeUserInformation 안에서 postImages.clear()가 호출되어 기존 DB 데이터가 고아 객체로 지워짐.
+        post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), newImage);
+        return PostResponseDto.from(post, post.getPostStatus());
+    }
+
+    @Transactional
+    public void deletePost(Long writerId, Long postId) {
+        Post post = getPostWithAuthorization(postId, writerId);
+
+        // 게시글 물리 이미지 파일 삭제
+        if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
+            for (PostImage postImage : post.getPostImages()) {
+                fileService.delete(postImage.getFileKey());
+            }
+        }
+
+        // cascade 옵션 때문에 postStatus도 같이 삭제됨.
+        postRepository.delete(post);
+    }
+
+    // ========== Private Methods ==========
+
+    // 게시글 조회 및 작성자 권한 검증을 동시에 수행하는 공통 메서드
+    private Post getPostWithAuthorization(Long postId, Long writerId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
+        
+        if (!post.getWriter().getId().equals(writerId)) {
+            throw new AuthorizedException("권한이 없습니다.");
+        }
+        return post;
     }
 }

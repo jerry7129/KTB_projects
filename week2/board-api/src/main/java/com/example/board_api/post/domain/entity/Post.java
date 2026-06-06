@@ -61,9 +61,10 @@ public class Post {
         }
     }
 
-    public void changePost(String title, String content){
+    public void changePostInformation(String title, String content, PostImage postImage){
         this.title = title;
         this.content = content;
+        this.changePostImage(postImage);
     }
 
     public List<String> getPostImageUris() {

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/posts")
@@ -32,13 +33,25 @@ public class PostController {
     }
 
     // 게시글 수정
-    @PatchMapping
+    @PatchMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostResponseDto>> updatePost (
             @AuthenticationPrincipal Long writerId,
-            @Valid @RequestBody PostRequestDto requestDto
+            @PathVariable("postId") Long postId,
+            @Valid @RequestPart("data") PostRequestDto requestDto,
+            @RequestPart("postImage")MultipartFile postImage
             ) {
-        PostResponseDto responseDto = postService.updatePost(writerId, requestDto);
-        return ResponseEntity.status((HttpStatus.OK))
+        PostResponseDto responseDto = postService.updatePostInfo(writerId, postId, requestDto, postImage);
+        return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.of("UPDATE_SUCCESS", "게시글 수정을 성공했습니다.", responseDto));
+    }
+
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<ApiResponse<Void>> deletePost (
+            @AuthenticationPrincipal Long writerId,
+            @PathVariable("postId") Long postId
+            ) {
+        postService.deletePost(writerId, postId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(ApiResponse.of("DELETE_SUCCESS", "게시글 삭제를 성공했습니다.", null));
     }
 }
