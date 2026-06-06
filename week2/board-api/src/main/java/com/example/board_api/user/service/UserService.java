@@ -12,7 +12,7 @@ import com.example.board_api.user.controller.dto.response.UserSignupResponseDto;
 import com.example.board_api.user.domain.UserQueryRepository;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
-import com.example.board_api.user.controller.dto.UserRequestDto;
+import com.example.board_api.user.controller.dto.request.UserRequestDto;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Optional;
 
 // Service Layer는 직접적인 비즈니스 로직을 펼치지 않고
 // Domain과 Repository의 구현체를 컨트롤한다.

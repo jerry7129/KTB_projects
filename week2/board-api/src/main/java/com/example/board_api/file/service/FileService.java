@@ -1,6 +1,8 @@
 package com.example.board_api.file.service;
 
+import com.example.board_api.file.domain.PostImageRepository;
 import com.example.board_api.file.domain.ProfileImageRepository;
+import com.example.board_api.file.domain.entity.PostImage;
 import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.global.exception.BusinessException;
 import com.example.board_api.global.exception.InvalidFileException;
@@ -32,23 +34,42 @@ public class FileService {
     private static final String FILE_URL = "/public";    // 클라이언트 접근 URL
     private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif"); // 허용할 확장자 목록
     private static ProfileImageRepository profileImageRepository;
+    private static PostImageRepository postImageRepository;
 
-    public FileService(ProfileImageRepository profileImageRepository) {
-        this.profileImageRepository = profileImageRepository;
+    public FileService(ProfileImageRepository profileImageRepository, PostImageRepository postImageRepository) {
+        FileService.profileImageRepository = profileImageRepository;
+        FileService.postImageRepository = postImageRepository;
     }
 
+    // ============= 이미지 업로드 (프로필, 게시글 사진) ===============
     public ProfileImage uploadProfileImage(MultipartFile file, Long userId) {
-        return uploadFile(file, "profile", userId);
+        String fileKey = uploadFile(file, "profile", userId);
+        return new ProfileImage(fileKey);
     }
 
+    public PostImage uploadPostImage(MultipartFile file, Long postId) {
+        String fileKey = uploadFile(file, "post", postId);
+        return new PostImage(fileKey);
+    }
+
+    // ============= 임시 이미지 업로드 (프로필, 게시글 사진) ===============
     public ProfileImage uploadTempProfileImage(MultipartFile file) {
         // 회원가입 전에는 userId가 없으므로 temp 디렉토리에 임시로 프로필 사진을 저장함.
-        ProfileImage tempImage = uploadFile(file, "temp", null);
+        String fileKey = uploadFile(file, "profile", null);
+        ProfileImage tempImage = new ProfileImage(fileKey);
         // 임시 파일의 경우 연관된 User가 없기 때문에, 수동으로 Repository에 접근함.
         return profileImageRepository.save(tempImage);
     }
 
-    public ProfileImage uploadFile(MultipartFile file, String prefix, Long id) {
+    public PostImage uploadTempPostImage(MultipartFile file) {
+        // 게시글 생성 전에는 postId가 없으므로 temp 디렉토리에 임시로 게시글 사진을 저장함.
+        String fileKey = uploadFile(file, "post", null);
+        PostImage tempImage = new PostImage(fileKey);
+        // 임시 파일의 경우 연관된 Post가 없기 때문에, 수동으로 Repository에 접근함.
+        return postImageRepository.save(tempImage);
+    }
+
+    public String uploadFile(MultipartFile file, String prefix, Long id) {
         // prefix 맨 앞에 "/"를 붙여보내는 실수를 할 경우를 방지 하기 위한 방어 코드. (본인이 실수 함)
         if(prefix.startsWith("/")){
             prefix = prefix.substring(1);
@@ -57,11 +78,9 @@ public class FileService {
         String extension = extractAndValidateExtension(file); // 확장자 검증
         String filename = generateFilename(prefix, extension); // 파일명 생성: prefix-timestamp-uuid.extention
 
-        // 실제 로컬 저장 경로: PROJECT_ROOT/uploads/profile/{userId}/{fileName}
-        Path directoryPath = FILE_DIR.resolve(prefix);
-        if (id != null) { // tmp에 임시 저장할 경우 id가 없어서 이에 대한 예외 처리.
-            directoryPath = directoryPath.resolve(id.toString());
-        }
+        // id가 null일 때는 임시 저장이므로 temp 디렉토리를 사용
+        String directoryName = (id == null) ? "temp" : prefix + "/" + id;
+        Path directoryPath = FILE_DIR.resolve(directoryName);
         Path savePath = directoryPath.resolve(filename);
 
         try {
@@ -74,19 +93,15 @@ public class FileService {
             throw new BusinessException("INTERNAL_SERVER_ERROR", "파일 저장을 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        // 웹 URL 경로: /public/profile/{userId}/{filename}
-        // 하지만, DB에는 /public/을 뺀 profile/{userId}/{filename} 만 저장한다.
+        // 웹 URL 경로: /public/{directoryName}/{filename}
+        // 하지만, DB에는 /public/을 뺀 경로만 저장한다.
         // AWS S3로 확장을 대비해 Object key로 저장하는 것.
-        String fileKey = prefix + "/";
-        if (id != null) { fileKey += id + "/"; } // 역시 id가 null 일 때 예외 처리.
-        fileKey += filename; // 일반적인 경우 /profile/{userId}/{filename}, 임시의 경우 /tmp/{filename}
+        String fileKey = directoryName + "/" + filename; 
 
-        // 연관 관계 편의 메소드를 통해 User에 ProfileImage를 추가함으로써
-        // 자동으로 ProfileImage DB table에 값을 저장하도록 유도함.
-        // 그래서 여기서 ProfileImageRepository.save()를 호출 안 함.
-        return new ProfileImage(fileKey);
+        return fileKey;
     }
 
+    // ============= 이미지 삭제 (프로필, 게시글 사진) ===============
     public void delete(String fileKey) {
         if (fileKey == null || fileKey.isBlank()) return;
         if (fileKey.equals("profile/default-profile.png")) return;
@@ -114,18 +129,28 @@ public class FileService {
 
     }
 
+    // ============= 이미지 업데이트 (프로필, 게시글 사진) ===============
     public ProfileImage updateProfileImage(String oldImageUrl, MultipartFile newFile, Long userId) {
-        return update(oldImageUrl, newFile, "profile", userId);
+        String fileKey = update(oldImageUrl, newFile, "profile", userId);
+        return new ProfileImage(fileKey);
     }
-    public ProfileImage update(String oldImageUrl, MultipartFile newFile, String prefix, Long id) {
+
+    public PostImage updatePostImage(String oldImageUrl, MultipartFile newFile, Long userId) {
+        String fileKey = update(oldImageUrl, newFile, "profile", userId);
+        return new PostImage(fileKey);
+    }
+
+    public String update(String oldImageUrl, MultipartFile newFile, String prefix, Long id) {
         delete(oldImageUrl);
 
         if (newFile == null || newFile.isEmpty()) {
             return null;
         }
-        return uploadFile(newFile, prefix, id);
+        String fileKey = uploadFile(newFile, prefix, id);
+        return fileKey;
     }
 
+    // ============= 임시 이미지 이동 (프로필, 게시글 사진) ===============
     // 회원가입 전 임시로 저장한 파일의 디렉토리를 /profile/{userId}로 변경함.
     public ProfileImage moveTempToProfile(String tempImageUrl, Long userId) {
         if (tempImageUrl == null || tempImageUrl.isBlank()) return null;
@@ -133,19 +158,47 @@ public class FileService {
         // DB에서 임시 프로필 이미지 있는 지 찾기
         // URL로 왔을 경우, 상대 주소로 바꾸고 공통으로 붙는 /public/을 지워 fileKey 로 만든다.
         String extractedPath = FileUtil.extractPathFromUrl(tempImageUrl);
-        String fileKey = extractedPath.replaceFirst("^/?public/", "");
+        String oldFileKey = extractedPath.replaceFirst("^/?public/", "");
 
-        ProfileImage file = profileImageRepository.findByFileKey(fileKey)
+        ProfileImage file = profileImageRepository.findByFileKey(oldFileKey)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        // 로컬 저장소의 현재 임시 프로필 이미지 저장 경로 계산
-        Path oldPath = FILE_DIR.resolve(fileKey).normalize();
+        String newFileKey = moveFile(oldFileKey, "profile", userId);
+
+        // DB 엔티티 정보 업데이트
+        file.updateFileKey(newFileKey);
+
+        // JPA의 영속성 컨텍스트 변경 감지(Dirty Checking)로 자동 업데이트 됩니다.
+        return file;
+    }
+
+    public PostImage moveTempToPost(String tempImageUrl, Long postId) {
+        if (tempImageUrl == null || tempImageUrl.isBlank()) return null;
+
+        String extractedPath = FileUtil.extractPathFromUrl(tempImageUrl);
+        String oldFileKey = extractedPath.replaceFirst("^/?public/", "");
+
+        PostImage file = postImageRepository.findByFileKey(oldFileKey)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
+
+        String newFileKey = moveFile(oldFileKey, "post", postId);
+
+        // DB 엔티티 정보 업데이트
+        file.updateFileKey(newFileKey);
+
+        return file;
+    }
+
+    private String moveFile(String oldFileKey, String newPrefix, Long targetId) {
+        // 로컬 저장소의 현재 임시 파일 저장 경로 계산
+        Path oldPath = FILE_DIR.resolve(oldFileKey).normalize();
+        
         // 경로 변경할 위치 계산
-        String newDirectory = "profile/" + userId;
+        String newDirectory = newPrefix + "/" + targetId;
         Path newDirectoryPath = FILE_DIR.resolve(newDirectory);
         Path newPath = newDirectoryPath.resolve(oldPath.getFileName()); // 파일명은 그대로 유지
 
-        // 프로필 이미지 실제 저장 경로 변경 (temp -> profile/{userId})
+        // 파일 실제 저장 경로 변경
         try {
             if (!Files.exists(newDirectoryPath)) {
                 Files.createDirectories(newDirectoryPath);
@@ -156,12 +209,8 @@ public class FileService {
             log.error("파일 이동 실패: {} -> {}", oldPath, newPath, e);
             throw new BusinessException("INTERNAL_SERVER_ERROR", "파일 이동에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        // DB 엔티티 정보 업데이트
-        String imageKey = newDirectory + "/" + oldPath.getFileName().toString();
-        file.updateFileKeyAndUserId(imageKey);
-
-        // JPA의 영속성 컨텍스트 변경 감지(Dirty Checking)로 자동 업데이트 됩니다.
-        return file;
+        
+        return newDirectory + "/" + oldPath.getFileName().toString();
     }
 
     // ========== Private Methods ==========

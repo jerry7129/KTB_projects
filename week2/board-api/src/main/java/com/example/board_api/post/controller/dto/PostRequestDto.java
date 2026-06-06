@@ -8,5 +8,5 @@ import lombok.NoArgsConstructor;
 public class PostRequestDto {
     private String postTitle;
     private String postContent;
-    private String postImage;
+    private String postImageUrl;
 }

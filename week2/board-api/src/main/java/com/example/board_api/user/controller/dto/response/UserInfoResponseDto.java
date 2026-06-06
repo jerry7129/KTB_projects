@@ -28,7 +28,7 @@ public record UserInfoResponseDto (
 
     public static UserInfoResponseDto from(User user) {
 
-        String fullProfileUrl = FileUtil.toFullUrl(user.getProfileImageUrl());
+        String fullProfileUrl = FileUtil.toFullUrl(user.getProfileImageUris());
 
         return of(
                 user.getId(),

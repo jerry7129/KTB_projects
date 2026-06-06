@@ -1,17 +1,24 @@
 package com.example.board_api.post.domain.entity;
 
 import com.example.board_api.file.domain.entity.PostImage;
+import com.example.board_api.file.domain.entity.ProfileImage;
+import com.example.board_api.user.domain.entity.User;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 import static lombok.AccessLevel.PROTECTED;
 
+@EntityListeners(AuditingEntityListener.class)
 @Entity
 @Getter
 @Table(name = "posts")
@@ -23,23 +30,31 @@ public class Post {
 
     private String title;
     private String content;
-    private Long writerId;
 
-    @OneToMany(mappedBy = "post", fetch = FetchType.LAZY)
+    @CreatedDate
+    @Column(updatable = false)
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "writer_id")
+    private User writer;
+
+    @OneToMany(mappedBy = "post", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PostImage> postImages = new ArrayList<>();
 
-    // Domain-Driven Design에서 서로 다른 Domain의 Entity를 직접 참조하는 것을 지양한다.
-    // 그래서 게시글의 작성자인 User의 id를 writerId에 저장해둔다.
-    // 이 id 값은 post 작성 시 http request message에 포함되어있다.
-    // 이후 post와 user의 연결이 필요할 경우 authorId를 기준으로
-    // repository에서 합쳐주면 된다.
+    @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private PostStatus postStatus;
+
 
     @Builder
-    public Post(String title, String content, Long writerId, List<PostImage> images) {
+    public Post(String title, String content, User writer, List<PostImage> images) {
         this.title = title;
         this.content = content;
-        this.writerId = writerId;
-        if (postImages != null) {
+        this.setWriter(writer);
+        if (images != null) {
             for (PostImage image : images) {
                 postImages.add(image);
             }
@@ -51,11 +66,40 @@ public class Post {
         this.content = content;
     }
 
-    // 연관 관계 편의 메소드
+    public List<String> getPostImageUris() {
+        List<String> postImageUris = new ArrayList<>();
+        for(PostImage postImage : postImages) {
+            postImageUris.add("/public/" + postImage.getFileKey());
+        }
+        return postImageUris;
+    }
+
+    // ========== 연관 관계 편의 메소드 ============
+
     // 주인 Entity인 PostImage 에서 정의하는 것보다는 (이미지가 어떤 게시글에 속할 지 결정)
     // 게시글에 이미지를 추가하는 것이기 때문에 Post Entity에 정의했다.
     public void addPostImage(PostImage postImage) {
         postImage.setPost(this);
         this.postImages.add(postImage);
+    }
+
+    // 프로필 사진 변경
+    public void changePostImage(PostImage postImage) {
+        this.postImages.clear(); // 기존 이미지 참조 해제 (orphanRemoval에 의해 DB에서 삭제됨)
+        if (postImage != null) {
+            postImage.setPost(this);
+            this.postImages.add(postImage);
+        }
+    }
+
+    // 주인 Entity인 Post 에서 정의.
+    // 게시글을 작성자가 쓴 게시글 리스트에 포함시킴.
+    public void setWriter(User writer) {
+        this.writer = writer;
+        writer.addPost(this);
+    }
+
+    public void setPostStatus(PostStatus postStatus) {
+        this.postStatus = postStatus;
     }
 }

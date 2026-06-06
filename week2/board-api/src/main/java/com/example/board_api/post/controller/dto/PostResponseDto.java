@@ -1,22 +1,48 @@
 package com.example.board_api.post.controller.dto;
 
-import lombok.Getter;
+import com.example.board_api.global.util.FileUtil;
+import com.example.board_api.post.domain.entity.PostStatus;
 import com.example.board_api.post.domain.entity.Post;
-import lombok.NoArgsConstructor;
 
-@Getter
-@NoArgsConstructor
-public class PostResponseDto {
-    private Long postId;
-    private String postTitle;
-    private String postContent;
-    private String postImage;
-    private Long postWriterId;
+public record PostResponseDto (
+    Long postId,
+    String postTitle,
+    String postContent,
+    String postImageUrl,
+    PostWriterResponseDto postWriter,
+    String createdAt,
+    String updatedAt
+    ) {
 
-    public PostResponseDto(Post post) {
-        postId = post.getId();
-        postTitle = post.getTitle();
-        postContent = post.getContent();
-//        postImage = post.getImage();
+    public static PostResponseDto of (
+        Long postId,
+        String postTitle,
+        String postContent,
+        String postImageUrl,
+        PostWriterResponseDto postWriter,
+        String createdAt,
+        String updatedAt
+    ) {
+        return new PostResponseDto(
+                postId, postTitle, postContent,
+                postImageUrl, postWriter, createdAt, updatedAt
+        );
+    }
+
+    public static PostResponseDto from(Post post, PostStatus postStatus) {
+        String fullPostImageUrl = null;
+        if (post.getPostImageUris() != null && !post.getPostImageUris().isEmpty()) {
+            fullPostImageUrl = FileUtil.toFullUrl(post.getPostImageUris().get(0));
+        }
+
+        return new PostResponseDto(
+                post.getId(),
+                post.getTitle(),
+                post.getContent(),
+                fullPostImageUrl,
+                PostWriterResponseDto.from(post.getWriter()),
+                post.getCreatedAt() != null ? post.getCreatedAt().toString() : null,
+                post.getUpdatedAt() != null ? post.getUpdatedAt().toString() : null
+        );
     }
 }

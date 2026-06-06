@@ -24,7 +24,7 @@ public class PostImage {
     private Post post;
 
     @Column(nullable = false, name = "image_key")
-    private String fileKey = "profile/default-profile.png";
+    private String fileKey;
 
     public PostImage(String fileKey) {
         this.fileKey = fileKey;
@@ -33,6 +33,10 @@ public class PostImage {
     // 연관 관계 편의 메소드
     public void setPost(Post post) {
         this.post = post;
+    }
+
+    public void updateFileKey(String fileKey) {
+        this.fileKey = fileKey;
     }
 
 }

@@ -7,18 +7,17 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class ProfileImageUploadResponseDto {
+public class ImageUploadResponseDto {
 
     private String fileUrl;
 
-    public static ProfileImageUploadResponseDto of(String fileUrl) {
-        return new ProfileImageUploadResponseDto(fileUrl);
+    public static ImageUploadResponseDto of(String fileUrl) {
+        return new ImageUploadResponseDto(fileUrl);
     }
 
-    public static ProfileImageUploadResponseDto from(ProfileImage file) {
+    public static ImageUploadResponseDto from(String fileKey) {
         // DB의 상대 경로(/public/...)를 전체 URL(http://...)로 변환
-        String fullUrl = FileUtil.toFullUrl("/public/" + file.getFileKey());
-
+        String fullUrl = FileUtil.toFullUrl("/public/" + fileKey);
         return of(fullUrl);
     }
 }

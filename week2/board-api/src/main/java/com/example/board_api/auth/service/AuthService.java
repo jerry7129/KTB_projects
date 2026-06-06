@@ -5,7 +5,6 @@ import com.example.board_api.auth.domain.RefreshTokenRepository;
 import com.example.board_api.auth.domain.entity.RefreshToken;
 import com.example.board_api.auth.repository.JwtProvider;
 import com.example.board_api.global.exception.AuthorizedException;
-import com.example.board_api.user.controller.dto.UserRequestDto;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;

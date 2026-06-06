@@ -1,7 +1,7 @@
 package com.example.board_api.user.controller;
 
 import com.example.board_api.global.ApiResponse;
-import com.example.board_api.user.controller.dto.UserRequestDto;
+import com.example.board_api.user.controller.dto.request.UserRequestDto;
 import com.example.board_api.user.controller.dto.response.UserInfoResponseDto;
 import com.example.board_api.user.controller.dto.response.UserSignupResponseDto;
 import com.example.board_api.user.service.UserService;

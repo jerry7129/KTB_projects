@@ -60,7 +60,7 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
                 .select(postImage.fileKey)
                 .from(postImage)
                 .join(postImage.post, post)
-                .where(post.writerId.eq(userId))
+                .where(post.writer.id.eq(userId))
                 .fetch();
 
         // 두 리스트 합쳐서 리턴.
@@ -84,13 +84,13 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
                         // JPQL은 DELETE 문에서 직접 JOIN을 쓸 수 없어서 서브 쿼리 생성.
                         JPAExpressions.select(post.id)
                                 .from(post)
-                                .where(post.writerId.eq(id))
+                                .where(post.writer.id.eq(id))
                 ))
                 .execute();
 
         // 유저가 작성한 게시글 삭제
         queryFactory.delete(post)
-                .where(post.writerId.eq(id))
+                .where(post.writer.id.eq(id))
                 .execute();
 
         // 유저 삭제

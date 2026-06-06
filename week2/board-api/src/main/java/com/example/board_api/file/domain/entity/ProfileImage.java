@@ -29,7 +29,7 @@ public class ProfileImage {
     }
 
     // 회원가입 시, 이미지 저장을 temp 디렉토리에 임시로 저장한 뒤에 회원가입 완료 후 경로를 바꾸기 위함.
-    public void updateFileKeyAndUserId(String fileKey) {
+    public void updateFileKey(String fileKey) {
         this.fileKey = fileKey;
     }
 

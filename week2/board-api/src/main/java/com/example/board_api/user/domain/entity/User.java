@@ -1,6 +1,7 @@
 package com.example.board_api.user.domain.entity;
 
 import com.example.board_api.file.domain.entity.ProfileImage;
+import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
 import jakarta.persistence.*;
@@ -36,12 +37,6 @@ public class User {
     @Column(nullable = false, unique = true)
     private String nickname;
 
-    @Builder.Default
-    // CascadeType.ALL -> 부모 entity가 삭제될 경우 자식도 모두 삭제함.
-    // orphanRemoval -> 자식 entity를 부모 List에서 제거할 경우 (고아 상태) DB에서도 삭제
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProfileImage> profileImages = new ArrayList<>();
-
     @Column(nullable = false, columnDefinition = "TINYINT")
     private UserRole role;
 
@@ -54,6 +49,17 @@ public class User {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+
+    // CascadeType.ALL -> 부모 entity가 삭제될 경우 자식도 모두 삭제함.
+    // orphanRemoval -> 자식 entity를 부모 List에서 제거할 경우 (고아 상태) DB에서도 삭제
+    @Builder.Default
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfileImage> profileImages = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "writer", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Post> post = new ArrayList<>();
 
     // User 정보 (닉네임, 프로필 사진 URL) 변경
     public void changeUserInformation(String nickname, ProfileImage profileImage){
@@ -74,11 +80,11 @@ public class User {
         this.password = password;
     }
 
-    public String getProfileImageUrl() {
+    public String getProfileImageUris() {
         if (this.profileImages == null) {
             return "/public/profile/default-profile.png";
         }
-        return "/public/" + this.getProfileImages().getLast().getFileKey();
+        return "/public/" + this.getProfileImages().get(0).getFileKey();
     }
 
     // ============ 연관 관계 편의 메소드 ===========
@@ -95,5 +101,10 @@ public class User {
     public void addProfileImage(ProfileImage profileImage) {
         profileImage.setUser(this);
         this.profileImages.add(profileImage);
+    }
+
+    // 게시글 추가
+    public void addPost(Post post) {
+        this.post.add(post);
     }
 }

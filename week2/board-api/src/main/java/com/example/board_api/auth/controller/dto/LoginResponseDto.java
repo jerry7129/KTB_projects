@@ -23,7 +23,7 @@ public class LoginResponseDto {
         return new LoginResponseDto(
                 new LoginUserInfoDto(
                         user.getId(), user.getEmail(), user.getNickname(),
-                        user.getProfileImageUrl(), user.getRole(), user.getStatus(),
+                        user.getProfileImageUris(), user.getRole(), user.getStatus(),
                         user.getCreatedAt().toString(), user.getUpdatedAt().toString()),
                 new TokenInfoDto(accessToken, expiresIn)
         );

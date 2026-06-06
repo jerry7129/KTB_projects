@@ -1,4 +1,4 @@
-package com.example.board_api.user.controller.dto;
+package com.example.board_api.user.controller.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
