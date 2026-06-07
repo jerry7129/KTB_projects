@@ -29,7 +29,7 @@ logging:
     # org.hibernate.orm.jdbc.bind: trace   # Hibernate 6 (파라미터 바인딩 로그)
 
 server:
-  port: 1234
+  port: 8290
 
 file:
   upload-dir: /Users/ktb_ksg/IdeaProjects/KTB_projects/week2/ImageStorage

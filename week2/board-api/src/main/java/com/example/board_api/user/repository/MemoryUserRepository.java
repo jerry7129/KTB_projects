@@ -6,10 +6,7 @@ package com.example.board_api.user.repository;
    이대로 지우기 아까워서 일단 레포에 남겨둡니다.
 
  ----------------------------------------------------------*/
-import com.example.board_api.user.repository.UserRepository;
 import com.example.board_api.user.domain.entity.User;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Repository;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;

@@ -5,7 +5,7 @@ import com.example.board_api.auth.repository.RefreshTokenRepository;
 import com.example.board_api.auth.domain.entity.RefreshToken;
 import com.example.board_api.auth.repository.JwtProvider;
 import com.example.board_api.global.exception.AuthorizedException;
-import com.example.board_api.user.repository.UserRepository;
+import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

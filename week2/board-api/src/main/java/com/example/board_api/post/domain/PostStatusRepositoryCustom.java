@@ -1,6 +1,6 @@
-package com.example.board_api.post.repository;
+package com.example.board_api.post.domain;
 
-public interface PostStatusQueryRepository {
+public interface PostStatusRepositoryCustom {
     void incrementViewCount(Long postId);
     void incrementLikeCount(Long postId);
     void decrementLikeCount(Long postId);

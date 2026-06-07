@@ -12,7 +12,7 @@ import com.example.board_api.user.controller.dto.response.UserSignupResponseDto;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
 import com.example.board_api.user.controller.dto.request.UserRequestDto;
-import com.example.board_api.user.repository.UserRepository;
+import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

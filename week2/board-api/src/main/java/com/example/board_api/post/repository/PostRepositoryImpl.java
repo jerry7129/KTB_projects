@@ -1,5 +1,6 @@
 package com.example.board_api.post.repository;
 
+import com.example.board_api.post.domain.PostRepositoryCustom;
 import com.example.board_api.post.domain.entity.Post;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -13,9 +14,9 @@ import static com.example.board_api.post.domain.entity.QPost.post;
 import static com.example.board_api.post.domain.entity.QPostStatus.postStatus;
 import static com.example.board_api.user.domain.entity.QUser.user;
 
-@Repository
+@Repository("postRepositoryImpl")
 @RequiredArgsConstructor
-public class PostQueryRepositoryImpl implements PostQueryRepository {
+public class PostRepositoryImpl implements PostRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 

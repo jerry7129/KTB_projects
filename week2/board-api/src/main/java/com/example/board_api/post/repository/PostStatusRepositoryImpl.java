@@ -1,14 +1,15 @@
 package com.example.board_api.post.repository;
 
+import com.example.board_api.post.domain.PostStatusRepositoryCustom;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 
 import static com.example.board_api.post.domain.entity.QPostStatus.postStatus;
 
-@Repository
+@Component
 @RequiredArgsConstructor
-public class PostStatusQueryRepositoryImpl implements PostStatusQueryRepository {
+public class PostStatusRepositoryImpl implements PostStatusRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 

@@ -1,5 +1,6 @@
 package com.example.board_api.user.repository;
 
+import com.example.board_api.user.domain.UserRepositoryCustom;
 import com.example.board_api.user.domain.entity.User;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -17,7 +18,7 @@ import static com.example.board_api.user.domain.entity.QUser.user;
 
 @Repository
 @RequiredArgsConstructor
-public class UserQueryRepositoryImpl implements UserQueryRepository {
+public class UserRepositoryImpl implements UserRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
 
