@@ -12,6 +12,7 @@ import java.time.Instant;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@lombok.Getter
 public class PostStatus {
 
     @Id

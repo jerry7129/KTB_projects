@@ -1,30 +1,33 @@
 package com.example.board_api.post.service;
 
 import com.example.board_api.file.domain.entity.PostImage;
-import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.file.service.FileService;
 import com.example.board_api.global.exception.AuthorizedException;
 import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.post.controller.dto.PostRequestDto;
 import com.example.board_api.post.controller.dto.PostResponseDto;
+import com.example.board_api.post.controller.dto.PostListCursorResponseDto;
+import com.example.board_api.post.domain.PostQueryRepository;
 import com.example.board_api.post.domain.PostRepository;
 import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.post.domain.entity.PostStatus;
-import com.example.board_api.user.controller.dto.response.UserInfoResponseDto;
 import com.example.board_api.user.domain.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.PageRequest;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Validated
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;
+    private final PostQueryRepository postQueryRepository;
     private final UserRepository userRepository;
     private final FileService fileService;
 
@@ -62,7 +65,7 @@ public class PostService {
             post.changePostImage(movedFile); // post 엔티티에 postImage 연결
         }
 
-        return PostResponseDto.from(post, postStatus);
+        return PostResponseDto.from(post);
     }
 
     @Transactional
@@ -89,7 +92,7 @@ public class PostService {
         // JPA의 dirty check를 사용. Transaction 종료 후에 자동으로 DB에 commit 됨.
         // changeUserInformation 안에서 postImages.clear()가 호출되어 기존 DB 데이터가 고아 객체로 지워짐.
         post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), newImage);
-        return PostResponseDto.from(post, post.getPostStatus());
+        return PostResponseDto.from(post);
     }
 
     @Transactional
@@ -107,7 +110,38 @@ public class PostService {
         postRepository.delete(post);
     }
 
-    // ========== Private Methods ==========
+    @Transactional(readOnly = true)
+    public PostListCursorResponseDto getPosts(Long cursor, int limit) {
+        List<Post> posts = postQueryRepository.findPostsWithCursor(cursor, PageRequest.of(0, limit));
+
+        boolean hasNext = false;
+        if (posts.size() > limit) {
+            hasNext = true;
+            posts.remove(limit);
+        }
+
+        Long nextCursor = hasNext ? posts.get(posts.size() - 1).getId() : null;
+
+        List<PostResponseDto> postDtos = posts.stream()
+                .map(PostResponseDto::from)
+                .collect(Collectors.toList());
+
+        return PostListCursorResponseDto.builder()
+                .posts(postDtos)
+                .nextCursor(nextCursor)
+                .hasNext(hasNext)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PostResponseDto getPost(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
+
+        return PostResponseDto.from(post);
+    }
+
+    // ========= private method ===========
 
     // 게시글 조회 및 작성자 권한 검증을 동시에 수행하는 공통 메서드
     private Post getPostWithAuthorization(Long postId, Long writerId) {
