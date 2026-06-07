@@ -13,6 +13,7 @@ import com.example.board_api.post.domain.entity.PostLike;
 import com.example.board_api.post.domain.entity.PostLikeEntityId;
 import com.example.board_api.post.repository.PostLikeRepository;
 import com.example.board_api.post.domain.entity.PostStatus;
+import com.example.board_api.post.repository.PostStatusRepository;
 import com.example.board_api.user.repository.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +34,9 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
-    private final PostStatusService postStatusService;
     private final UserRepository userRepository;
+    private final PostStatusRepository postStatusRepository;
+    private final PostViewCountService postViewCountService;
 
     // 게시글 이미지 첨부를 위해서는 게시글 생성 전에 이미지를 먼저 저장해서 임시 주소를 발급 받아야함.
     @Transactional
@@ -127,19 +129,21 @@ public class PostService {
 
         Long nextCursor = hasNext ? posts.get(posts.size() - 1).getId() : null;
 
-        List<PostResponseDto> postDtos = posts.stream()
+        List<PostResponseDto> postList = posts.stream()
                 .map(PostResponseDto::from)
                 .collect(Collectors.toList());
 
         return PostListCursorResponseDto.builder()
-                .posts(postDtos)
+                .posts(postList)
                 .nextCursor(nextCursor)
                 .hasNext(hasNext)
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PostResponseDto getPost(Long postId) {
+        postViewCountService.incrementViewCount(postId);
+
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
 
@@ -163,16 +167,20 @@ public class PostService {
                 .post(post)
                 .build();
 
+        // likes table에 좋아요를 누른 유저랑 게시글 아이디를 저장
         postLikeRepository.save(postLike);
-        postStatusService.incrementLikeCount(postId);
+        // postStatus의 likeCount를 증가
+        postStatusRepository.incrementLikeCount(postId);
     }
 
     @Transactional
     public void removeLike(Integer userId, Long postId) {
         PostLikeEntityId id = new PostLikeEntityId(userId, postId);
         postLikeRepository.findById(id).ifPresent(postLike -> {
+            // likes table에 좋아요를 누른 유저랑 게시글 아이디를 제거
             postLikeRepository.delete(postLike);
-            postStatusService.decrementLikeCount(postId);
+            // postStatus의 likeCount를 감소
+            postStatusRepository.decrementLikeCount(postId);
         });
     }
 
