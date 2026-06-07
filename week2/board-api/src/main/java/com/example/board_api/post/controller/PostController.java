@@ -25,7 +25,7 @@ public class PostController {
     // 게시글 업로드
     @PostMapping
     public ResponseEntity<ApiResponse<PostResponseDto>> createPost (
-            @AuthenticationPrincipal Long writerId,
+            @AuthenticationPrincipal Integer writerId,
             @Valid @RequestBody PostRequestDto requestDto
             ) {
         PostResponseDto responseDto = postService.createPost(writerId, requestDto);
@@ -36,7 +36,7 @@ public class PostController {
     // 게시글 수정
     @PatchMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostResponseDto>> updatePost (
-            @AuthenticationPrincipal Long writerId,
+            @AuthenticationPrincipal Integer writerId,
             @PathVariable("postId") Long postId,
             @Valid @RequestPart("data") PostRequestDto requestDto,
             @RequestPart("postImage")MultipartFile postImage
@@ -49,9 +49,9 @@ public class PostController {
     // 게시글 삭제
     @DeleteMapping("/{postId}")
     public ResponseEntity<ApiResponse<Void>> deletePost (
-            @AuthenticationPrincipal Long writerId,
+            @AuthenticationPrincipal Integer writerId,
             @PathVariable("postId") Long postId
-            ) {
+    ) {
         postService.deletePost(writerId, postId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT)
                 .body(ApiResponse.of("DELETE_SUCCESS", "게시글 삭제를 성공했습니다.", null));
@@ -69,12 +69,34 @@ public class PostController {
                 ApiResponse.of("GET_SUCCESS", "게시글 목록 조회를 성공했습니다.", responseDto));
     }
 
-    // 특정 게시글 조회
+    // 특정 게시글 조지
     @GetMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostResponseDto>> getPost(
             @PathVariable("postId") Long postId
     ) {
         PostResponseDto responseDto = postService.getPost(postId);
         return ResponseEntity.ok(ApiResponse.of("GET_SUCCESS", "게시글 목록 조회를 성공했습니다.", responseDto));
+    }
+
+    // 특정 게시글 좋아요수 증가
+    @PostMapping("/{postId}/likes")
+    public ResponseEntity<ApiResponse<Void>> addLike(
+            @AuthenticationPrincipal Integer userId,
+            @PathVariable("postId") Long postId
+    ) {
+        postService.addLike(userId, postId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.of("LIKE_SUCCESS", "게시글 좋아요를 성공했습니다.", null));
+    }
+
+    // 특정 게시글 좋아요수 감소
+    @DeleteMapping("/{postId}/likes")
+    public ResponseEntity<ApiResponse<Void>> removeLike(
+            @AuthenticationPrincipal Integer userId,
+            @PathVariable("postId") Long postId
+    ) {
+        postService.removeLike(userId, postId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(ApiResponse.of("UNLIKE_SUCCESS", "게시글 좋아요 취소를 성공했습니다.", null));
     }
 }

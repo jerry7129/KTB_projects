@@ -23,12 +23,12 @@ public class RefreshToken {
     private String token;
 
     @Column(nullable = false)
-    private Long userId;
+    private Integer userId;
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
-    public RefreshToken(String token, Long userId, LocalDateTime expiresAt) {
+    public RefreshToken(String token, Integer userId, LocalDateTime expiresAt) {
         this.token = token;
         this.userId = userId;
         this.expiresAt = expiresAt;

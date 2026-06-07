@@ -5,7 +5,7 @@ import com.example.board_api.user.domain.entity.User;
 import java.util.Optional;
 
 public record UserInfoResponseDto (
-        Long userId,
+        Integer userId,
         String email,
         String nickname,
         String profileImageUrl,
@@ -14,7 +14,7 @@ public record UserInfoResponseDto (
     ) {
 
     public static UserInfoResponseDto of(
-            Long userId,
+            Integer userId,
             String email,
             String nickname,
             String profileImageUrl,

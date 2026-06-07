@@ -57,7 +57,7 @@ public class FileController {
     // 프로필 이미지 업로드
     @PostMapping("/users/me/profile-image")
     public ResponseEntity<ApiResponse<ImageUploadResponseDto>> uploadProfileImage(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal Integer userId,
             @RequestPart("profileImage") MultipartFile file
     ) throws FileUploadException {
         ProfileImage savedFile = fileService.uploadProfileImage(file, userId);

@@ -1,6 +1,5 @@
 package com.example.board_api.user.repository;
 
-import com.example.board_api.user.domain.UserQueryRepository;
 import com.example.board_api.user.domain.entity.User;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -34,19 +33,19 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
     }
 
     @Override
-    public Optional<User> findByIdWithProfileImage(Long id) {
+    public Optional<User> findByIdWithProfileImage(Integer userId) {
         return Optional.ofNullable(
                 queryFactory
                         .selectFrom(user)
                         .leftJoin(user.profileImages).fetchJoin()
-                        .where(user.id.eq(id))
+                        .where(user.id.eq(userId))
                         .fetchOne()
         );
     }
 
     // 특정 유저의 프로필 사진과 유저가 작성한 게시글에 있는 사진들의 키를 모두 조회하는 쿼리.
     @Override
-    public List<String> findByUserIdWidthAllImageKeys(Long userId) {
+    public List<String> findByUserIdWidthAllImageKeys(Integer userId) {
 
         // 프로필 이미지 키 조회.
         List<String> profileKeys = queryFactory
@@ -72,10 +71,10 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
 
 
     @Override
-    public void deleteByIdWithProfileImageWithPost(Long id) {
+    public void deleteByIdWithProfileImageWithPost(Integer userId) {
         // 유저 프로필 사진 삭제
         queryFactory.delete(profileImage)
-                .where(profileImage.user.id.eq(id))
+                .where(profileImage.user.id.eq(userId))
                 .execute();
 
         // 유저가 작성한 게시글의 이미지 삭제
@@ -84,18 +83,18 @@ public class UserQueryRepositoryImpl implements UserQueryRepository {
                         // JPQL은 DELETE 문에서 직접 JOIN을 쓸 수 없어서 서브 쿼리 생성.
                         JPAExpressions.select(post.id)
                                 .from(post)
-                                .where(post.writer.id.eq(id))
+                                .where(post.writer.id.eq(userId))
                 ))
                 .execute();
 
         // 유저가 작성한 게시글 삭제
         queryFactory.delete(post)
-                .where(post.writer.id.eq(id))
+                .where(post.writer.id.eq(userId))
                 .execute();
 
         // 유저 삭제
         queryFactory.delete(user)
-                .where(user.id.eq(id))
+                .where(user.id.eq(userId))
                 .execute();
     }
 }

@@ -39,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 토큰이 유효한 액세스 토큰인지 확인
                 if (jwtProvider.isAccessToken(token)) {
                     // 토큰에서 사용자 ID 추출
-                    Long userId = jwtProvider.getUserId(token);
+                    Integer userId = jwtProvider.getUserId(token);
 
                     // 인증 객체 생성 및 SecurityContext에 설정
                     UsernamePasswordAuthenticationToken authentication =

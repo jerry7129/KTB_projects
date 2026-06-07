@@ -1,7 +1,7 @@
 package com.example.board_api.file.service;
 
-import com.example.board_api.file.domain.PostImageRepository;
-import com.example.board_api.file.domain.ProfileImageRepository;
+import com.example.board_api.file.repository.PostImageRepository;
+import com.example.board_api.file.repository.ProfileImageRepository;
 import com.example.board_api.file.domain.entity.PostImage;
 import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.global.exception.BusinessException;
@@ -42,8 +42,8 @@ public class FileService {
     }
 
     // ============= 이미지 업로드 (프로필, 게시글 사진) ===============
-    public ProfileImage uploadProfileImage(MultipartFile file, Long userId) {
-        String fileKey = uploadFile(file, "profile", userId);
+    public ProfileImage uploadProfileImage(MultipartFile file, Integer userId) {
+        String fileKey = uploadFile(file, "profile", Long.valueOf(userId));
         return new ProfileImage(fileKey);
     }
 
@@ -130,8 +130,8 @@ public class FileService {
     }
 
     // ============= 이미지 업데이트 (프로필, 게시글 사진) ===============
-    public ProfileImage updateProfileImage(String oldImageUrl, MultipartFile newFile, Long userId) {
-        String fileKey = update(oldImageUrl, newFile, "profile", userId);
+    public ProfileImage updateProfileImage(String oldImageUrl, MultipartFile newFile, Integer userId) {
+        String fileKey = update(oldImageUrl, newFile, "profile", Long.valueOf(userId));
         return new ProfileImage(fileKey);
     }
 
@@ -152,7 +152,7 @@ public class FileService {
 
     // ============= 임시 이미지 이동 (프로필, 게시글 사진) ===============
     // 회원가입 전 임시로 저장한 파일의 디렉토리를 /profile/{userId}로 변경함.
-    public ProfileImage moveTempToProfile(String tempImageUrl, Long userId) {
+    public ProfileImage moveTempToProfile(String tempImageUrl, Integer userId) {
         if (tempImageUrl == null || tempImageUrl.isBlank()) return null;
 
         // DB에서 임시 프로필 이미지 있는 지 찾기
@@ -163,7 +163,7 @@ public class FileService {
         ProfileImage file = profileImageRepository.findByFileKey(oldFileKey)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
 
-        String newFileKey = moveFile(oldFileKey, "profile", userId);
+        String newFileKey = moveFile(oldFileKey, "profile", Long.valueOf(userId));
 
         // DB 엔티티 정보 업데이트
         file.updateFileKey(newFileKey);

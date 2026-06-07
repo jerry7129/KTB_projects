@@ -32,7 +32,7 @@ public class UserController {
 
     @PatchMapping("/me")
     public ResponseEntity<ApiResponse<UserInfoResponseDto>> updateUserInfo(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal Integer userId,
             @Valid @RequestPart(value = "data") UserRequestDto.UpdateInfo requestDto,
             // RequestParam 은 Query String 값을 가져올 때도 쓰이지만,
             // 지금 처럼 Form-Data를 가져올 때도 쓰인다.
@@ -45,7 +45,7 @@ public class UserController {
 
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deleteUserInfo(
-            @AuthenticationPrincipal Long userId
+            @AuthenticationPrincipal Integer userId
     ) {
         userService.deleteUser(userId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT)
@@ -54,7 +54,7 @@ public class UserController {
 
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> updateUserPassword(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal Integer userId,
             @Valid @RequestBody UserRequestDto.UpdatePassword requestDto
             ) {
         userService.updateUserPassword(userId, requestDto);

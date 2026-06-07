@@ -35,7 +35,7 @@ public class LoginResponseDto {
     @Getter
     @AllArgsConstructor
     public static class LoginUserInfoDto {
-        private Long userId;
+        private Integer userId;
         private String email;
         private String nickname;
         private String profileImageUrl;

@@ -1,6 +1,6 @@
 //package com.example.board_api.file.repository;
 //
-//import com.example.board_api.file.domain.FileRepository;
+//import com.example.board_api.file.repository.FileRepository;
 //import org.springframework.stereotype.Repository;
 //
 //@Repository

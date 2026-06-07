@@ -6,7 +6,6 @@ package com.example.board_api.auth.repository;
    이대로 지우기 아까워서 일단 레포에 남겨둡니다.
 
  ----------------------------------------------------------*/
-import com.example.board_api.auth.domain.RefreshTokenRepository;
 import com.example.board_api.auth.domain.entity.RefreshToken;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;

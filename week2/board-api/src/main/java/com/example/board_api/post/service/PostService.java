@@ -7,11 +7,13 @@ import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.post.controller.dto.PostRequestDto;
 import com.example.board_api.post.controller.dto.PostResponseDto;
 import com.example.board_api.post.controller.dto.PostListCursorResponseDto;
-import com.example.board_api.post.domain.PostQueryRepository;
-import com.example.board_api.post.domain.PostRepository;
+import com.example.board_api.post.repository.PostRepository;
 import com.example.board_api.post.domain.entity.Post;
+import com.example.board_api.post.domain.entity.PostLike;
+import com.example.board_api.post.domain.entity.PostLikeEntityId;
+import com.example.board_api.post.repository.PostLikeRepository;
 import com.example.board_api.post.domain.entity.PostStatus;
-import com.example.board_api.user.domain.UserRepository;
+import com.example.board_api.user.repository.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,14 +28,17 @@ import java.util.stream.Collectors;
 @Validated
 @RequiredArgsConstructor
 public class PostService {
-    private final PostRepository postRepository;
-    private final PostQueryRepository postQueryRepository;
-    private final UserRepository userRepository;
+
     private final FileService fileService;
+
+    private final PostRepository postRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostStatusService postStatusService;
+    private final UserRepository userRepository;
 
     // 게시글 이미지 첨부를 위해서는 게시글 생성 전에 이미지를 먼저 저장해서 임시 주소를 발급 받아야함.
     @Transactional
-    public PostResponseDto createPost(Long writerId, PostRequestDto requestDto) {
+    public PostResponseDto createPost(Integer writerId, PostRequestDto requestDto) {
         User writer = userRepository.findById(writerId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
 
@@ -70,10 +75,10 @@ public class PostService {
 
     @Transactional
     public PostResponseDto updatePostInfo(
-            Long writerId, Long postId,
+            Integer writerId, Long postId,
             PostRequestDto requestDto, MultipartFile postImage
     ) {
-        Post post = getPostWithAuthorization(postId, writerId);
+        Post post = getPostWithAuthorization(writerId, postId);
 
         // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
         // 변경 시, 기존에 가지고 있던 모든 프로필 이미지의 물리 파일을 삭제. (고아 파일 방지)
@@ -96,8 +101,8 @@ public class PostService {
     }
 
     @Transactional
-    public void deletePost(Long writerId, Long postId) {
-        Post post = getPostWithAuthorization(postId, writerId);
+    public void deletePost(Integer writerId, Long postId) {
+        Post post = getPostWithAuthorization(writerId, postId);
 
         // 게시글 물리 이미지 파일 삭제
         if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
@@ -112,7 +117,7 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public PostListCursorResponseDto getPosts(Long cursor, int limit) {
-        List<Post> posts = postQueryRepository.findPostsWithCursor(cursor, PageRequest.of(0, limit));
+        List<Post> posts = postRepository.findPostsWithCursor(cursor, PageRequest.of(0, limit));
 
         boolean hasNext = false;
         if (posts.size() > limit) {
@@ -141,10 +146,40 @@ public class PostService {
         return PostResponseDto.from(post);
     }
 
+    @Transactional
+    public void addLike(Integer userId, Long postId) {
+        if (postLikeRepository.existsById(new PostLikeEntityId(userId, postId))) {
+            // 이미 좋아요를 누른 경우 무시하거나 예외 처리
+            return;
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
+
+        PostLike postLike = PostLike.builder()
+                .user(user)
+                .post(post)
+                .build();
+
+        postLikeRepository.save(postLike);
+        postStatusService.incrementLikeCount(postId);
+    }
+
+    @Transactional
+    public void removeLike(Integer userId, Long postId) {
+        PostLikeEntityId id = new PostLikeEntityId(userId, postId);
+        postLikeRepository.findById(id).ifPresent(postLike -> {
+            postLikeRepository.delete(postLike);
+            postStatusService.decrementLikeCount(postId);
+        });
+    }
+
     // ========= private method ===========
 
     // 게시글 조회 및 작성자 권한 검증을 동시에 수행하는 공통 메서드
-    private Post getPostWithAuthorization(Long postId, Long writerId) {
+    private Post getPostWithAuthorization(Integer writerId, Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
         

@@ -1,6 +1,5 @@
 package com.example.board_api.post.repository;
 
-import com.example.board_api.post.domain.PostQueryRepository;
 import com.example.board_api.post.domain.entity.Post;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;

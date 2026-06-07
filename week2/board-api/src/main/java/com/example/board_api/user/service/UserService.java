@@ -1,7 +1,7 @@
 package com.example.board_api.user.service;
 
-import com.example.board_api.auth.domain.RefreshTokenRepository;
-import com.example.board_api.file.domain.ProfileImageRepository;
+import com.example.board_api.auth.repository.RefreshTokenRepository;
+import com.example.board_api.file.repository.ProfileImageRepository;
 import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.file.service.FileService;
 import com.example.board_api.global.exception.BusinessException;
@@ -9,11 +9,10 @@ import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.global.util.FileUtil;
 import com.example.board_api.user.controller.dto.response.UserInfoResponseDto;
 import com.example.board_api.user.controller.dto.response.UserSignupResponseDto;
-import com.example.board_api.user.domain.UserQueryRepository;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
 import com.example.board_api.user.controller.dto.request.UserRequestDto;
-import com.example.board_api.user.domain.UserRepository;
+import com.example.board_api.user.repository.UserRepository;
 import com.example.board_api.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -32,11 +31,12 @@ import java.util.List;
 @Validated
 @RequiredArgsConstructor
 public class UserService {
-    private final UserRepository userRepository;
-    private final UserQueryRepository userQueryRepository;
+
     private final FileService fileService;
-    private final ProfileImageRepository profileImageRepository;
     private final PasswordEncoder passwordEncoder;
+
+    private final UserRepository userRepository;
+    private final ProfileImageRepository profileImageRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
     // 회원 가입 로직
@@ -76,9 +76,9 @@ public class UserService {
     }
 
     @Transactional
-    public UserInfoResponseDto getUser(Long userId) {
+    public UserInfoResponseDto getUser(Integer userId) {
         // userId를 지닌 유저가 있는 지 체크, 동시에 images의 Object key 값도 가져옴.
-        User user = userQueryRepository.findByIdWithProfileImage(userId)
+        User user = userRepository.findByIdWithProfileImage(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
         return UserInfoResponseDto.from(user);
     }
@@ -88,12 +88,12 @@ public class UserService {
     // 1. 디스크의 물리 이미지 삭제 -> 2. 새로운 이미지 업로드
     @Transactional
     public UserInfoResponseDto updateUserInfo(
-            Long userId,
+            Integer userId,
             UserRequestDto.UpdateInfo requestDto,
             MultipartFile profileImage
         ) {
         // userId를 지닌 유저가 있는 지 체크
-        User user = userQueryRepository.findByIdWithProfileImage(userId)
+        User user = userRepository.findByIdWithProfileImage(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
         // 변경하려는 nickname을 갖고있는 유저가 있는 지 체크
         if(!user.getNickname().equals(requestDto.getNickname()) &&
@@ -122,7 +122,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserNickname(Long userId, UserRequestDto.UpdateInfo requestDto) {
+    public void updateUserNickname(Integer userId, UserRequestDto.UpdateInfo requestDto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
 
@@ -136,7 +136,7 @@ public class UserService {
     }
 
     @Transactional
-    public void updateUserPassword(Long userId, UserRequestDto.UpdatePassword requestDto) {
+    public void updateUserPassword(Integer userId, UserRequestDto.UpdatePassword requestDto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
 
@@ -147,9 +147,9 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUser(Long userId) {
+    public void deleteUser(Integer userId) {
         // 일단 삭제하려는 유저와 연관된 이미지(프로필 사진, 유저가 작성한 게시글의 이미지)의 이미지 키 리스트를 조회
-        List<String> targetImageKeys = userQueryRepository.findByUserIdWidthAllImageKeys(userId);
+        List<String> targetImageKeys = userRepository.findByUserIdWidthAllImageKeys(userId);
         // 각 이미지 키를 바탕으로 실제 물리 파일을 삭제
         // 현재 로컬 디스크에 저장하는 경우 파일 삭제는 잘 되지만, 파일 경로에 생긴 폴더는 삭제가 안됨.
         // 향후에 해결 예결
@@ -161,7 +161,7 @@ public class UserService {
         refreshTokenRepository.deleteByUserId(userId);
 
         // DB table에서 유저와 연관된 데이터를 일괄 삭제함.
-        userQueryRepository.deleteByIdWithProfileImageWithPost(userId);
+        userRepository.deleteByIdWithProfileImageWithPost(userId);
     }
 
 

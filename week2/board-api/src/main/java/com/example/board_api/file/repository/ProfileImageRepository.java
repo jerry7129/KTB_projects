@@ -1,4 +1,4 @@
-package com.example.board_api.file.domain;
+package com.example.board_api.file.repository;
 
 import com.example.board_api.file.domain.entity.ProfileImage;
 import org.springframework.data.jpa.repository.JpaRepository;

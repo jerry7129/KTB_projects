@@ -4,13 +4,13 @@ import com.example.board_api.global.util.FileUtil;
 import com.example.board_api.user.domain.entity.User;
 
 public record PostWriterResponseDto (
-    Long postWriterId,
+    Integer postWriterId,
     String postWriterNickname,
     String postWriterProfileImageUrl
     ){
 
     public static PostWriterResponseDto of (
-        Long postWriterId,
+        Integer postWriterId,
         String postWriterNickname,
         String postWriterProfileImageUrl
         ) {

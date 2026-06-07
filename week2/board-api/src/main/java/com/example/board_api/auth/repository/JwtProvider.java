@@ -31,7 +31,7 @@ public class JwtProvider {
 
     private String createToken(
             String type,
-            Long userId,
+            Integer userId,
             Map<String, Object> claims,
             Long expSeconds
     ) {
@@ -47,7 +47,7 @@ public class JwtProvider {
                 .compact();
     }
 
-    public String createAccessToken(Long userId, String email, String nickname) {
+    public String createAccessToken(Integer userId, String email, String nickname) {
         return createToken(
                 "access",
                 userId,
@@ -56,7 +56,7 @@ public class JwtProvider {
         );
     }
 
-    public String createRefreshToken(Long userId) {
+    public String createRefreshToken(Integer userId) {
         return createToken(
                 "refresh",
                 userId,
@@ -77,8 +77,8 @@ public class JwtProvider {
         return "access".equals(parse(token).getPayload().get("type", String.class));
     }
 
-    public Long getUserId(String token) {
-        return Long.valueOf(parse(token).getPayload().getSubject());
+    public Integer getUserId(String token) {
+        return Integer.valueOf(parse(token).getPayload().getSubject());
     }
 
     public Long getAccessTokenValidityInMilliseconds() {

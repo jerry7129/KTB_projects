@@ -1,4 +1,4 @@
-package com.example.board_api.post.domain;
+package com.example.board_api.post.repository;
 
 import com.example.board_api.post.domain.entity.Post;
 import org.springframework.data.domain.Pageable;
