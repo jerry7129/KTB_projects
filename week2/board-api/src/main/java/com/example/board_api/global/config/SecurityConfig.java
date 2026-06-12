@@ -33,6 +33,8 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/users",
+            "/users/email",
+            "/users/nickname",
             "/auth",
             "/public/**",
             "/users/temp-profile-image",

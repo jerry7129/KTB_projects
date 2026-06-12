@@ -18,12 +18,12 @@ public record PostWriterResponseDto (
     }
 
     public static PostWriterResponseDto from (User writer) {
-        String fullProfileUrl = FileUtil.toFullUrl(writer.getProfileImageUris());
+        String profileUrl = writer.getProfileImageUris();
 
         return of (
                 writer.getId(),
                 writer.getNickname(),
-                fullProfileUrl
+                profileUrl
         );
     }
 }

@@ -89,8 +89,7 @@ public class UserService {
     @Transactional
     public UserInfoResponseDto updateUserInfo(
             Integer userId,
-            UserRequestDto.UpdateInfo requestDto,
-            MultipartFile profileImage
+            UserRequestDto.UpdateInfo requestDto
         ) {
         // userId를 지닌 유저가 있는 지 체크
         User user = userRepository.findByIdWithProfileImage(userId)
@@ -101,18 +100,17 @@ public class UserService {
             throw new BusinessException("USER_NICKNAME_CONFLICT", "중복된 닉네임 입니다.", HttpStatus.CONFLICT);
         }
 
+        ProfileImage newImage = resolveProfileImage(requestDto.getProfileImageUrl());
+
         // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
         // 변경 시, 기존에 가지고 있던 모든 프로필 이미지의 물리 파일을 삭제. (고아 파일 방지)
         if (user.getProfileImages() != null && !user.getProfileImages().isEmpty()) {
             for (ProfileImage oldImage : user.getProfileImages()) {
+                if (newImage != null && oldImage.getFileKey().equals(newImage.getFileKey())) {
+                    continue; // 삭제하지 않을 이미지
+                }
                 fileService.delete(oldImage.getFileKey());
             }
-        }
-
-        ProfileImage newImage = null;
-        if (profileImage != null && !profileImage.isEmpty()) {
-            // update할 profileImage를 /uploads/{userId} 에 업로드
-            newImage = fileService.uploadProfileImage(profileImage, user.getId());
         }
 
         // JPA의 dirty check를 사용. Transaction 종료 후에 자동으로 DB에 commit 됨.
@@ -164,6 +162,20 @@ public class UserService {
         userRepository.deleteByIdWithProfileImageWithPost(userId);
     }
 
+
+    @Transactional(readOnly = true)
+    public void checkEmail(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new BusinessException("USER_EMAIL_CONFLICT", "중복된 이메일 입니다.", HttpStatus.CONFLICT);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void checkNickname(String nickname) {
+        if (userRepository.findByNickname(nickname).isPresent()) {
+            throw new BusinessException("USER_NICKNAME_CONFLICT", "중복된 닉네임 입니다.", HttpStatus.CONFLICT);
+        }
+    }
 
     // ========== Private Methods ==========
     private ProfileImage resolveProfileImage(String profileImageUrl) {

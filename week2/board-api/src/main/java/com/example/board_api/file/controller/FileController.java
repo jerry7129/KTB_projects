@@ -72,7 +72,7 @@ public class FileController {
     }
 
     // 게시글 이미지 업로드
-    @PostMapping("/posts/{postId}/profile-image")
+    @PostMapping("/posts/{postId}/post-image")
     public ResponseEntity<ApiResponse<ImageUploadResponseDto>> uploadPostImage(
             @PathVariable Long postId,
             @RequestPart("postImage") MultipartFile file
@@ -82,8 +82,8 @@ public class FileController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.of(
-                        "PROFILE_IMAGE_UPLOADED",
-                        "프로필 수정을 위한 프로필 이미지가 업로드 되었습니다.",
+                        "POST_IMAGE_UPLOADED",
+                        "게시글 수정을 위한 게시글 이미지가 업로드 되었습니다.",
                         ImageUploadResponseDto.from(savedFile.getFileKey())
                 ));
     }

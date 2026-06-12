@@ -7,6 +7,7 @@ import com.example.board_api.global.exception.NotFoundException;
 import com.example.board_api.post.controller.dto.PostRequestDto;
 import com.example.board_api.post.controller.dto.PostResponseDto;
 import com.example.board_api.post.controller.dto.PostListCursorResponseDto;
+import com.example.board_api.post.controller.dto.LikeResponseDto;
 import com.example.board_api.post.domain.PostRepository;
 import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.post.domain.entity.PostLike;
@@ -25,6 +26,9 @@ import org.springframework.data.domain.PageRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.example.board_api.file.repository.PostImageRepository;
+import com.example.board_api.global.util.FileUtil;
+
 @Service
 @Validated
 @RequiredArgsConstructor
@@ -37,6 +41,7 @@ public class PostService {
     private final UserRepository userRepository;
     private final PostStatusRepository postStatusRepository;
     private final PostViewCountService postViewCountService;
+    private final PostImageRepository postImageRepository;
 
     // 게시글 이미지 첨부를 위해서는 게시글 생성 전에 이미지를 먼저 저장해서 임시 주소를 발급 받아야함.
     @Transactional
@@ -72,34 +77,54 @@ public class PostService {
             post.changePostImage(movedFile); // post 엔티티에 postImage 연결
         }
 
-        return PostResponseDto.from(post);
+        return PostResponseDto.from(post, false);
     }
 
     @Transactional
     public PostResponseDto updatePostInfo(
             Integer writerId, Long postId,
-            PostRequestDto requestDto, MultipartFile postImage
+            PostRequestDto requestDto
     ) {
         Post post = getPostWithAuthorization(writerId, postId);
 
-        // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
-        // 변경 시, 기존에 가지고 있던 모든 프로필 이미지의 물리 파일을 삭제. (고아 파일 방지)
-        if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
-            for (PostImage oldImage : post.getPostImages()) {
-                fileService.delete(oldImage.getFileKey());
-            }
+        PostImage newImage = null;
+        if (requestDto.getPostImageUrl() != null && !requestDto.getPostImageUrl().isBlank()) {
+            newImage = resolvePostImage(requestDto.getPostImageUrl());
         }
 
-        PostImage newImage = null;
-        if (postImage != null && !postImage.isEmpty()) {
-            // update할 postImage를 /uploads/{postId} 에 업로드
-            newImage = fileService.uploadPostImage(postImage, post.getId());
+        // 이미지를 디스크에 저장 - 현재는 local 서버의 /uploads 폴더에 저장 중
+        // 변경 시, 기존에 가지고 있던 물리 파일을 삭제. (고아 파일 방지)
+        boolean isImageChanged = false;
+        if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
+            PostImage oldImage = post.getPostImages().get(0);
+            if (newImage == null || !oldImage.getFileKey().equals(newImage.getFileKey())) {
+                fileService.delete(oldImage.getFileKey());
+                isImageChanged = true;
+            }
+        } else if (newImage != null) {
+            isImageChanged = true;
         }
 
         // JPA의 dirty check를 사용. Transaction 종료 후에 자동으로 DB에 commit 됨.
-        // changeUserInformation 안에서 postImages.clear()가 호출되어 기존 DB 데이터가 고아 객체로 지워짐.
-        post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), newImage);
-        return PostResponseDto.from(post);
+        // changePostInformation 안에서 postImages.clear()가 호출되어 기존 DB 데이터가 고아 객체로 지워짐.
+        if (isImageChanged) {
+            post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), newImage);
+        } else {
+            post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), 
+                    (post.getPostImages() != null && !post.getPostImages().isEmpty()) ? post.getPostImages().get(0) : null);
+        }
+        return PostResponseDto.from(post, false);
+    }
+
+    private PostImage resolvePostImage(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        String extractedPath = FileUtil.extractPathFromUrl(imageUrl);
+        String fileKey = extractedPath.replaceFirst("^/?public/", "");
+
+        return postImageRepository.findByFileKey(fileKey)
+                .orElseThrow(() -> new NotFoundException("POST_IMAGE_NOT_FOUND"));
     }
 
     @Transactional
@@ -130,7 +155,7 @@ public class PostService {
         Long nextCursor = hasNext ? posts.get(posts.size() - 1).getId() : null;
 
         List<PostResponseDto> postList = posts.stream()
-                .map(PostResponseDto::from)
+                .map(post -> PostResponseDto.from(post, false))
                 .collect(Collectors.toList());
 
         return PostListCursorResponseDto.builder()
@@ -141,20 +166,25 @@ public class PostService {
     }
 
     @Transactional
-    public PostResponseDto getPost(Long postId) {
+    public PostResponseDto getPost(Long postId, Integer userId) {
         postViewCountService.incrementViewCount(postId);
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
 
-        return PostResponseDto.from(post);
+        Boolean isLiked = false;
+        if (userId != null) {
+            isLiked = postLikeRepository.existsById(new PostLikeEntityId(userId, postId));
+        }
+
+        return PostResponseDto.from(post, isLiked);
     }
 
     @Transactional
-    public void addLike(Integer userId, Long postId) {
+    public LikeResponseDto addLike(Integer userId, Long postId) {
         if (postLikeRepository.existsById(new PostLikeEntityId(userId, postId))) {
-            // 이미 좋아요를 누른 경우 무시하거나 예외 처리
-            return;
+            // 이미 좋아요를 누른 경우
+            return new LikeResponseDto(postStatusRepository.getLikeCount(postId));
         }
 
         User user = userRepository.findById(userId)
@@ -171,10 +201,12 @@ public class PostService {
         postLikeRepository.save(postLike);
         // postStatus의 likeCount를 증가
         postStatusRepository.incrementLikeCount(postId);
+
+        return new LikeResponseDto(postStatusRepository.getLikeCount(postId));
     }
 
     @Transactional
-    public void removeLike(Integer userId, Long postId) {
+    public LikeResponseDto removeLike(Integer userId, Long postId) {
         PostLikeEntityId id = new PostLikeEntityId(userId, postId);
         postLikeRepository.findById(id).ifPresent(postLike -> {
             // likes table에 좋아요를 누른 유저랑 게시글 아이디를 제거
@@ -182,6 +214,8 @@ public class PostService {
             // postStatus의 likeCount를 감소
             postStatusRepository.decrementLikeCount(postId);
         });
+
+        return new LikeResponseDto(postStatusRepository.getLikeCount(postId));
     }
 
     // ========= private method ===========

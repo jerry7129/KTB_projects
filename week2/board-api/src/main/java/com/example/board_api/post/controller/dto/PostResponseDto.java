@@ -13,6 +13,7 @@ public record PostResponseDto (
     Integer likeCount,
     Long commentCount,
     Long viewCount,
+    Boolean isLiked,
     String createdAt,
     String updatedAt
     ) {
@@ -26,6 +27,7 @@ public record PostResponseDto (
         Integer likeCount,
         Long commentCount,
         Long viewCount,
+        Boolean isLiked,
         String createdAt,
         String updatedAt
     ) {
@@ -33,25 +35,26 @@ public record PostResponseDto (
                 postId, postTitle, postContent,
                 postImageUrl, postWriter,
                 likeCount, commentCount, viewCount,
-                createdAt, updatedAt
+                isLiked, createdAt, updatedAt
         );
     }
 
-    public static PostResponseDto from(Post post) {
-        String fullPostImageUrl = null;
+    public static PostResponseDto from(Post post, Boolean isLiked) {
+        String postImageUrl = null;
         if (post.getPostImageUris() != null && !post.getPostImageUris().isEmpty()) {
-            fullPostImageUrl = FileUtil.toFullUrl(post.getPostImageUris().get(0));
+            postImageUrl = post.getPostImageUris().get(0);
         }
 
         return of (
                 post.getId(),
                 post.getTitle(),
                 post.getContent(),
-                fullPostImageUrl,
+                postImageUrl,
                 PostWriterResponseDto.from(post.getWriter()),
                 post.getPostStatus().getLikeCount(),
                 post.getPostStatus().getCommentCount(),
                 post.getPostStatus().getViewCount(),
+                isLiked,
                 post.getCreatedAt() != null ? post.getCreatedAt().toString() : null,
                 post.getUpdatedAt() != null ? post.getUpdatedAt().toString() : null
         );

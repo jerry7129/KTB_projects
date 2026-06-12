@@ -59,4 +59,13 @@ public class PostStatusRepositoryImpl implements PostStatusRepositoryCustom {
                         .and(postStatus.commentCount.gt(0L))) // 음수 방지
                 .execute();
     }
+
+    // 좋아요수 조회
+    @Override
+    public Integer getLikeCount(Long postId) {
+        return queryFactory.select(postStatus.likeCount)
+                .from(postStatus)
+                .where(postStatus.id.eq(postId))
+                .fetchOne();
+    }
 }

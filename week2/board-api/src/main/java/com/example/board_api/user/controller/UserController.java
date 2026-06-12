@@ -30,15 +30,21 @@ public class UserController {
                 .body(ApiResponse.of("SIGNUP_SUCCESS", "회원가입이 완료되었습니다.", responseDto));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserInfoResponseDto>> getUserInfo(
+            @AuthenticationPrincipal Integer userId
+    ) {
+        UserInfoResponseDto responseDto = userService.getUser(userId);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.of("GET_SUCCESS", "회원 정보 조회가 완료되었습니다.", responseDto));
+    }
+
     @PatchMapping("/me")
     public ResponseEntity<ApiResponse<UserInfoResponseDto>> updateUserInfo(
             @AuthenticationPrincipal Integer userId,
-            @Valid @RequestPart(value = "data") UserRequestDto.UpdateInfo requestDto,
-            // RequestParam 은 Query String 값을 가져올 때도 쓰이지만,
-            // 지금 처럼 Form-Data를 가져올 때도 쓰인다.
-            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage
+            @Valid @RequestBody UserRequestDto.UpdateInfo requestDto
             ) {
-        UserInfoResponseDto responseDto = userService.updateUserInfo(userId, requestDto, profileImage);
+        UserInfoResponseDto responseDto = userService.updateUserInfo(userId, requestDto);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.of("UPDATE_SUCCESS", "회원 정보 수정이 완료되었습니다.", responseDto));
     }
@@ -60,5 +66,19 @@ public class UserController {
         userService.updateUserPassword(userId, requestDto);
         return ResponseEntity.status(HttpStatus.NO_CONTENT)
                 .body(ApiResponse.of("UPDATE_SUCCESS", "비밀번호 수정이 완료되었습니다.", null));
+    }
+
+    @GetMapping(params = "email")
+    public ResponseEntity<ApiResponse<Void>> checkEmail(@RequestParam("email") String email) {
+        userService.checkEmail(email);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.of("CHECK_SUCCESS", "사용 가능한 이메일입니다.", null));
+    }
+
+    @GetMapping(params = "nickname")
+    public ResponseEntity<ApiResponse<Void>> checkNickname(@RequestParam("nickname") String nickname) {
+        userService.checkNickname(nickname);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.of("CHECK_SUCCESS", "사용 가능한 닉네임입니다.", null));
     }
 }

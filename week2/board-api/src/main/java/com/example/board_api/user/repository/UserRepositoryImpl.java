@@ -14,6 +14,8 @@ import java.util.Optional;
 import static com.example.board_api.file.domain.entity.QPostImage.postImage;
 import static com.example.board_api.file.domain.entity.QProfileImage.profileImage;
 import static com.example.board_api.post.domain.entity.QPost.post;
+import static com.example.board_api.post.domain.entity.QPostLike.postLike;
+import static com.example.board_api.post.domain.entity.QPostStatus.postStatus;
 import static com.example.board_api.user.domain.entity.QUser.user;
 
 @Repository
@@ -76,6 +78,29 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
         // 유저 프로필 사진 삭제
         queryFactory.delete(profileImage)
                 .where(profileImage.user.id.eq(userId))
+                .execute();
+
+        // 유저가 좋아요 누른 내역 삭제
+        queryFactory.delete(postLike)
+                .where(postLike.user.id.eq(userId))
+                .execute();
+
+        // 유저가 작성한 게시글에 달린 좋아요 삭제
+        queryFactory.delete(postLike)
+                .where(postLike.post.id.in(
+                        JPAExpressions.select(post.id)
+                                .from(post)
+                                .where(post.writer.id.eq(userId))
+                ))
+                .execute();
+
+        // 유저가 작성한 게시글의 상태 삭제
+        queryFactory.delete(postStatus)
+                .where(postStatus.post.id.in(
+                        JPAExpressions.select(post.id)
+                                .from(post)
+                                .where(post.writer.id.eq(userId))
+                ))
                 .execute();
 
         // 유저가 작성한 게시글의 이미지 삭제

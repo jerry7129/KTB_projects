@@ -28,13 +28,13 @@ public record UserInfoResponseDto (
 
     public static UserInfoResponseDto from(User user) {
 
-        String fullProfileUrl = FileUtil.toFullUrl(user.getProfileImageUris());
+        String profileUrl = user.getProfileImageUris();
 
         return of(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
-                fullProfileUrl,
+                profileUrl,
                 user.getCreatedAt().toString(),
                 user.getUpdatedAt().toString()
         );

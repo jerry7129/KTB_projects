@@ -91,6 +91,11 @@ public class User {
     // ============ 연관 관계 편의 메소드 ===========
     // 프로필 사진 변경
     public void changeProfileImage(ProfileImage profileImage) {
+        if (!this.profileImages.isEmpty() && profileImage != null) {
+            if (this.profileImages.getLast().getFileKey().equals(profileImage.getFileKey())) {
+                return; // 동일한 이미지면 변경 생략
+            }
+        }
         this.profileImages.clear(); // 기존 이미지 참조 해제 (orphanRemoval에 의해 DB에서 삭제됨)
         if (profileImage != null) {
             profileImage.setUser(this);

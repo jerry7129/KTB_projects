@@ -44,12 +44,14 @@ public class FileService {
     // ============= 이미지 업로드 (프로필, 게시글 사진) ===============
     public ProfileImage uploadProfileImage(MultipartFile file, Integer userId) {
         String fileKey = uploadFile(file, "profile", Long.valueOf(userId));
-        return new ProfileImage(fileKey);
+        ProfileImage image = new ProfileImage(fileKey);
+        return profileImageRepository.save(image);
     }
 
     public PostImage uploadPostImage(MultipartFile file, Long postId) {
         String fileKey = uploadFile(file, "post", postId);
-        return new PostImage(fileKey);
+        PostImage image = new PostImage(fileKey);
+        return postImageRepository.save(image);
     }
 
     // ============= 임시 이미지 업로드 (프로필, 게시글 사진) ===============

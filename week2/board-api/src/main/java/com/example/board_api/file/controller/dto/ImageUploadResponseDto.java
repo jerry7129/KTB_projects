@@ -16,8 +16,8 @@ public class ImageUploadResponseDto {
     }
 
     public static ImageUploadResponseDto from(String fileKey) {
-        // DB의 상대 경로(/public/...)를 전체 URL(http://...)로 변환
-        String fullUrl = FileUtil.toFullUrl("/public/" + fileKey);
-        return of(fullUrl);
+        // DB의 상대 경로(/public/...) 반환
+        String url = "/public/" + fileKey;
+        return of(url);
     }
 }

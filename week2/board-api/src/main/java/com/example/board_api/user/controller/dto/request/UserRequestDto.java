@@ -60,7 +60,7 @@ public class UserRequestDto {
                 regexp = "^.*\\.(jpg|jpeg|png|gif)$",
                 message = "{user.profile-image.pattern}"
         )
-        private String profileImage;
+        private String profileImageUrl;
     }
 
     // 회원 비밀번호 수정 Dto
