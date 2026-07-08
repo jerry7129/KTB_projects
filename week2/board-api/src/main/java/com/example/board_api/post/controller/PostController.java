@@ -1,12 +1,10 @@
 package com.example.board_api.post.controller;
 
 import com.example.board_api.global.ApiResponse;
-import com.example.board_api.post.controller.dto.PostRequestDto;
-import com.example.board_api.post.controller.dto.PostResponseDto;
-import com.example.board_api.post.controller.dto.PostListCursorResponseDto;
-import com.example.board_api.post.controller.dto.LikeResponseDto;
+import com.example.board_api.post.controller.dto.*;
 import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.post.service.PostService;
+import com.example.board_api.post.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class PostController {
     private final PostService postService;
+    private final CommentService commentService;
 
     // 게시글 업로드
     @PostMapping
@@ -69,7 +68,7 @@ public class PostController {
                 ApiResponse.of("GET_SUCCESS", "게시글 목록 조회를 성공했습니다.", responseDto));
     }
 
-    // 특정 게시글 조지
+    // 특정 게시글 조회
     @GetMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostResponseDto>> getPost(
             @AuthenticationPrincipal Integer userId,
@@ -99,5 +98,16 @@ public class PostController {
         LikeResponseDto responseDto = postService.removeLike(userId, postId);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.of("UNLIKE_SUCCESS", "게시글 좋아요 취소를 성공했습니다.", responseDto));
+    }
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentResponseDto>> addComment(
+            @AuthenticationPrincipal Integer userId,
+            @PathVariable("postId") Long postId,
+            @RequestBody CommentRequestDto requestDto
+    ) {
+        CommentResponseDto responseDto = commentService.createComment(userId, postId, requestDto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.of("CREATE_SUCCESS", "댓글 생성을 성공했습니다.", responseDto));
     }
 }

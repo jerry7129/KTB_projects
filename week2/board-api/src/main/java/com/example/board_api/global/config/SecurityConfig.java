@@ -38,7 +38,8 @@ public class SecurityConfig {
             "/auth",
             "/public/**",
             "/users/temp-profile-image",
-            "/token"
+            "/token",
+            "/health"
     };
 
     @Bean

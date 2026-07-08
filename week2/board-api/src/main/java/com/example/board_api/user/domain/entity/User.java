@@ -82,7 +82,7 @@ public class User {
 
     // 프로필 이미지 Uri 가져오기
     public String getProfileImageUris() {
-        if (this.profileImages == null) {
+        if (this.profileImages == null || this.profileImages.isEmpty()) {
             return "/public/profile/default-profile.png";
         }
         return "/public/" + this.getProfileImages().getLast().getFileKey();

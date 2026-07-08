@@ -48,6 +48,9 @@ public class Post {
     @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private PostStatus postStatus;
 
+    @OneToMany(mappedBy = "post", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Comment> postComments = new ArrayList<>();
+
 
     @Builder
     public Post(String title, String content, User writer, List<PostImage> images) {

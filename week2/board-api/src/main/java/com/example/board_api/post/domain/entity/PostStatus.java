@@ -3,8 +3,10 @@ package com.example.board_api.post.domain.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 
@@ -12,7 +14,8 @@ import java.time.Instant;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@lombok.Getter
+@Getter
+@EntityListeners(AuditingEntityListener.class)
 public class PostStatus {
 
     @Id

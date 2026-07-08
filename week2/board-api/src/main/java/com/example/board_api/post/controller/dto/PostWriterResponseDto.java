@@ -1,6 +1,5 @@
 package com.example.board_api.post.controller.dto;
 
-import com.example.board_api.global.util.FileUtil;
 import com.example.board_api.user.domain.entity.User;
 
 public record PostWriterResponseDto (
