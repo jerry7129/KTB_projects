@@ -1,0 +1,138 @@
+name: Deploy board-ktb
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  AWS_ACCOUNT_ID: 180294193538
+
+  BACKEND_ECR_REPOSITORY: ktb-board-spring
+  FRONTEND_ECR_REPOSITORY: ktb-board-express
+
+  PLATFORM: linux/arm64
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image variables
+        id: vars
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+
+          echo "backend_image=${REGISTRY}/${BACKEND_ECR_REPOSITORY}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${REGISTRY}/${FRONTEND_ECR_REPOSITORY}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}
+            ${{ steps.vars.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:latest
+
+      - name: Build and push frontend ARM64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: ${{ env.PLATFORM }}
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}
+            ${{ steps.vars.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:latest
+
+      - name: Deploy to App EC2 instances via SSM
+        run: |
+          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
+
+          DEPLOY_COMMAND="sudo /opt/ktb-board/bin/deploy.sh all ${IMAGE_TAG} ${IMAGE_TAG}"
+
+          echo "Deploy command: ${DEPLOY_COMMAND}"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --document-name "AWS-RunShellScript" \
+              --targets \
+                "Key=tag:Project,Values=ktb-board" \
+                "Key=tag:Role,Values=app" \
+                "Key=tag:Env,Values=prod" \
+              --parameters "commands=[\"${DEPLOY_COMMAND}\"]" \
+              --comment "Deploy board-ktb ${IMAGE_TAG}" \
+              --max-concurrency "1" \
+              --max-errors "0" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          echo "SSM Command ID: ${COMMAND_ID}"
+
+          for i in {1..60}; do
+            echo "Polling deployment status... attempt ${i}/60"
+
+            aws ssm list-command-invocations \
+              --region "${AWS_REGION}" \
+              --command-id "${COMMAND_ID}" \
+              --details \
+              --output table
+
+            STATUSES="$(
+              aws ssm list-command-invocations \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --query "CommandInvocations[].Status" \
+                --output text
+            )"
+
+            echo "Current statuses: ${STATUSES}"
+
+            if echo "${STATUSES}" | grep -Eq "Failed|Cancelled|TimedOut|Cancelling"; then
+              echo "Deployment failed."
+              exit 1
+            fi
+
+            if [ -n "${STATUSES}" ] && ! echo "${STATUSES}" | grep -Eq "Pending|InProgress|Delayed"; then
+              echo "Deployment completed."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "Deployment polling timed out."
+          exit 1
