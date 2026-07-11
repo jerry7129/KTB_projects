@@ -22,7 +22,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
 
     steps:
       # Github Repository 코드를 Runner로 가져오는 단계
@@ -59,27 +59,28 @@ jobs:
           echo "BACKEND_IMAGE=${BACKEND_IMAGE}"
           echo "FRONTEND_IMAGE=${FRONTEND_IMAGE}"
 
+      # Docker Buildx 설정 (ARM64 아키텍처 명시 위함)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
       # Backend 이미지 빌드 및 ECR에 Push
       - name: Build and push backend ARM64 image
         run: |
-          docker build \
+          docker buildx build \
+            --platform linux/arm64 \
             -t "${{ steps.vars.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}" \
+            --push \
             ./backend
-      
-      - name: Push backend image
-        run: |
-          docker push "${{ steps.vars.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}"
 
       # Frontend 이미지 빌드 및 ECR에 Push
       - name: Build and push frontend ARM64 image
         run: |
-          docker build \
+          docker buildx build \
+            --platform linux/arm64 \
             -t "${{ steps.vars.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}" \
+            --push \
             ./frontend
 
-      - name: Push frontend image
-        run: |
-          docker push "${{ steps.vars.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:${{ steps.vars.outputs.image_tag }}"
 
       # SSM으로 App-A, App-B EC2 인스턴스에 deploy.sh 스크립트 실행 명령
       - name: Deploy to App EC2 instances via SSM
