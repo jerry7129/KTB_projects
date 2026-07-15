@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-// Service Layer는 직접적인 비즈니스 로직을 펼치지 않고
+// Service Layer는 직접적인 비즈니스 로직을 펼치지 않고  
 // Domain과 Repository의 구현체를 컨트롤한다.
 // 비즈니스 로직 인터페이스와 엔티티는 Domain에 있음.
 @Service
