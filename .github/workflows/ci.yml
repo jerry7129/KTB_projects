@@ -1,0 +1,310 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+# PR 변경 파일 조회를 위해 read만 추가
+# OIDC를 사용하여 AWS에 액세스할 필요가 없으므로 id-token 권한은 제거
+permissions:
+  contents: read
+  pull-requests: read
+
+# 중복 CI 실행 방지
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # 브랜치 정책 검사와 변경 파일 감지
+  prepare:
+    name: Prepare PR CI
+
+    # Draft PR (작업 중인 코드를 임시로 올린 PR) 생성 시에는 CI를 수행하지 않고,
+    # ready_for_review 이벤트에서 실제 CI 실행
+    if: ${{ github.event.pull_request.draft == false }}
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+
+    steps:
+      # 브랜치 정책 검사
+      - name: Validate branch flow
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -Eeuo pipefail
+
+          echo "PR: ${HEAD_BRANCH} -> ${BASE_BRANCH}"
+
+          case "${BASE_BRANCH}" in
+            develop)
+              # feature 개발 또는 main의 hotfix 내용을 develop에 동기화
+              if [[ "${HEAD_BRANCH}" != feature/* &&
+                    "${HEAD_BRANCH}" != "main" ]]; then
+                echo "::error::develop에는 feature/* 또는 main만 병합할 수 있습니다."
+                exit 1
+              fi
+              ;;
+
+            main)
+              # 정식 릴리스 또는 긴급 수정
+              if [[ "${HEAD_BRANCH}" != "develop" &&
+                    "${HEAD_BRANCH}" != hotfix/* ]]; then
+                echo "::error::main에는 develop 또는 hotfix/*만 병합할 수 있습니다."
+                exit 1
+              fi
+              ;;
+
+            *)
+              echo "::error::지원하지 않는 대상 브랜치입니다: ${BASE_BRANCH}"
+              exit 1
+              ;;
+          esac
+
+      # GitHub PR Files API 사용해 변경 파일 감지
+      # https://docs.github.com/en/rest/pulls/pulls#list-pull-requests
+      - name: Detect changed components
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -Eeuo pipefail
+
+          # gh CLI를 사용해 PR 변경 파일 조회 및 CHANGED_FILES 환경변수에 저장
+          # 한 번에 100개씩 페이징 처리하며 모든 변경 파일을 가져옴
+          CHANGED_FILES="$(
+            gh api --paginate \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+              --jq '.[].filename'
+          )"
+
+          echo "Changed files:"
+          if [[ -n "${CHANGED_FILES}" ]]; then
+            printf '%s\n' "${CHANGED_FILES}"
+          else
+            echo "(none)"
+          fi
+
+          BACKEND_CHANGED=false
+          FRONTEND_CHANGED=false
+
+          # CHANGED_FILES 내 backend/ 디렉토리의 변경 파일이 있는지 확인
+          if grep -Eq '^backend/' <<< "${CHANGED_FILES}"; then
+            BACKEND_CHANGED=true
+          fi
+
+          # CHANGED_FILES 내 frontend/ 디렉토리의 변경 파일이 있는지 확인
+          if grep -Eq '^frontend/' <<< "${CHANGED_FILES}"; then
+            FRONTEND_CHANGED=true
+          fi
+
+          # 공통 CI, 배포 설정 변경 시 두 컴포넌트 모두 검증
+          COMMON_FILE_PATTERN='^(\.github/(workflows|actions)/|docker-compose(\.[^/]*)?\.ya?ml$|compose(\.[^/]*)?\.ya?ml$)'
+
+          if grep -Eq "${COMMON_FILE_PATTERN}" <<< "${CHANGED_FILES}"; then
+            BACKEND_CHANGED=true
+            FRONTEND_CHANGED=true
+          fi
+
+          {
+            echo "backend=${BACKEND_CHANGED}"
+            echo "frontend=${FRONTEND_CHANGED}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "Backend changed: ${BACKEND_CHANGED}"
+          echo "Frontend changed: ${FRONTEND_CHANGED}"
+
+  # Backend 변경 감지 됐을 경우에만 실행
+  backend-ci:
+    name: Backend CI
+    needs:
+      - prepare
+
+    if: ${{ needs.prepare.outputs.backend == 'true' }}
+
+    # 배포 대상 EC2가 ARM64이므로 Native ARM Runner 유지
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        # 이 Job의 모든 run 명령은 backend 디렉토리에서 실행되도록 설정
+        shell: bash
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Checkout 후 Runner에 GitHub Token을 남기지 않음
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            backend/**/*.gradle*
+            backend/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Grant Gradle wrapper permission
+        run: chmod +x ./gradlew
+
+      # check에 test 및 Gradle 검증 작업 포함
+      # bootJar는 Dockerfile에서 생성하므로 여기서는 중복 실행하지 않음
+      - name: Run backend checks
+        run: ./gradlew check --no-daemon --build-cache
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Validate backend Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+
+          platforms: linux/arm64
+
+          # 이미지를 Docker daemon이나 Registry로 내보내지 않고
+          # 최종 Stage까지 빌드 성공 여부만 검증
+          outputs: type=cacheonly
+
+          cache-from: type=gha,scope=backend-ci-arm64
+          cache-to: type=gha,mode=max,scope=backend-ci-arm64,ignore-error=true
+
+          # 저장하거나 배포하지 않는 검증용 빌드이므로 불필요한 메타데이터 생성을 끈다.
+          provenance: false
+          sbom: false
+
+  # Frontend 변경 감지 됐을 경우에만 실행
+  frontend-ci:
+    name: Frontend CI
+    needs:
+      - prepare
+
+    if: ${{ needs.prepare.outputs.frontend == 'true' }}
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # lint와 test는 devDependencies가 필요할 수 있으므로
+      # Dockerfile과 달리 --omit=dev를 사용하지 않는다.
+      - name: Install test dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Run frontend lint
+        run: npm run lint --if-present
+
+      - name: Run frontend tests
+        run: npm run test --if-present
+
+      # 프론트 Dockerfile은 COPY . .를 수행한다.
+      # CI에서 생성한 node_modules가 이미지 내부의 production node_modules를
+      # 덮어쓰는 것을 방지한다.
+      - name: Clean host dependencies from Docker context
+        run: rm -rf node_modules
+
+      # npm run build는 Dockerfile의 Builder Stage에서 수행하므로
+      # Runner에서 다시 실행하지 않음
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Validate frontend Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+
+          platforms: linux/arm64
+          outputs: type=cacheonly
+
+          cache-from: type=gha,scope=frontend-ci-arm64
+          cache-to: type=gha,mode=max,scope=frontend-ci-arm64,ignore-error=true
+
+          provenance: false
+          sbom: false
+
+  # Branch Protection에서는 이 Job만 Required Check로 등록
+  ci-gate:
+    name: CI Gate
+    needs:
+      - prepare
+      - backend-ci
+      - frontend-ci
+
+    # 선행 Job이 실패하거나 skipped여도 최종 상태를 판정한다.
+    if: ${{ always() && github.event.pull_request.draft == false }}
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify all required jobs
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          BACKEND_RESULT: ${{ needs.backend-ci.result }}
+          FRONTEND_RESULT: ${{ needs.frontend-ci.result }}
+        run: |
+          set -Eeuo pipefail
+
+          echo "Prepare: ${PREPARE_RESULT}"
+          echo "Backend CI: ${BACKEND_RESULT}"
+          echo "Frontend CI: ${FRONTEND_RESULT}"
+
+          if [[ "${PREPARE_RESULT}" != "success" ]]; then
+            echo "::error::브랜치 정책 검사 또는 변경 파일 감지에 실패했습니다."
+            exit 1
+          fi
+
+          for result in "${BACKEND_RESULT}" "${FRONTEND_RESULT}"; do
+            case "${result}" in
+              success|skipped)
+                ;;
+              *)
+                echo "::error::컴포넌트 CI Job이 성공하지 못했습니다: ${result}"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "All required CI checks passed."

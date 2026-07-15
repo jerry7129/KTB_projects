@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Builder Stage
-FROM gradle:jdk21 AS builder
+FROM amazoncorretto:21 AS builder
 
 LABEL authors="ktb_ksg"
 
@@ -9,18 +9,18 @@ WORKDIR /app
 
 # Gradle Wrapper와 빌드 설정을 먼저 복사
 # Overlafs 캐시 이점 살리기 위함
-COPY --chown=gradle:gradle gradlew ./
-COPY --chown=gradle:gradle gradle ./gradle
-COPY --chown=gradle:gradle settings.gradle* ./
-COPY --chown=gradle:gradle build.gradle* ./
+COPY gradlew ./
+COPY gradle ./gradle
+COPY settings.gradle* ./
+COPY build.gradle* ./
 
 RUN chmod +x gradlew
 
 # 소스 코드 복사
-COPY --chown=gradle:gradle src ./src
+COPY src ./src
 
 # Spring Boot 실행 JAR 생성
-RUN --mount=type=cache,target=/home/gradle/.gradle,uid=1000,gid=1000 \
+RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew bootJar --no-daemon \
     && JAR_FILE="$(find build/libs \
         -maxdepth 1 \

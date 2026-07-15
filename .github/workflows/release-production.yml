@@ -1,0 +1,286 @@
+name: Release Production
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "배포할 Git tag (예: v1.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Production 배포가 동시에 두 개 실행되지 않도록 막는다.
+concurrency:
+  group: ktb-board-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  AWS_ACCOUNT_ID: "180294193538"
+
+  MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
+  MANIFEST_PREFIX: ktb-board/manifests
+
+jobs:
+  release:
+    name: Release to Production
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # GitHub Environment의 승인 규칙과 Secret을 사용한다.
+    environment: production
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # 전체 Git history는 필요 없고,
+      # Git tag를 조회하기 위한 최소한의 저장소 정보만 받는다.
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prepare release metadata
+        id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="${INPUT_VERSION}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+
+          # 과제에서는 major.minor.patch 형식만 허용한다.
+          if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::잘못된 버전입니다: ${VERSION}"
+            echo "::error::예시: v1.0.0"
+            exit 1
+          fi
+
+          # Lightweight tag와 Annotated tag를 모두 처리할 수 있도록
+          # 해당 tag만 별도로 fetch한다.
+          git fetch \
+            origin \
+            "refs/tags/${VERSION}:refs/tags/${VERSION}" \
+            --force \
+            --depth=1
+
+          if ! git show-ref \
+            --verify \
+            --quiet \
+            "refs/tags/${VERSION}"; then
+
+            echo "::error::Git tag가 존재하지 않습니다: ${VERSION}"
+            exit 1
+          fi
+
+          COMMIT_SHA="$(
+            git rev-list \
+              -n 1 \
+              "refs/tags/${VERSION}"
+          )"
+
+          # 태그 commit이 main에 포함된 commit인지 확인한다.
+          COMPARE_STATUS="$(
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/compare/${COMMIT_SHA}...main" \
+              --jq '.status'
+          )"
+
+          if [[ "${COMPARE_STATUS}" != "ahead" &&
+                "${COMPARE_STATUS}" != "identical" ]]; then
+
+            echo "::error::Release tag는 main에 포함된 commit이어야 합니다."
+            echo "::error::Tag: ${VERSION}"
+            echo "::error::Commit: ${COMMIT_SHA}"
+            exit 1
+          fi
+
+          CANDIDATE_URI="s3://${MANIFEST_BUCKET}/${MANIFEST_PREFIX}/candidates/${COMMIT_SHA}.json"
+          RELEASE_URI="s3://${MANIFEST_BUCKET}/${MANIFEST_PREFIX}/releases/${VERSION}.json"
+
+          {
+            echo "version=${VERSION}"
+            echo "commit_sha=${COMMIT_SHA}"
+            echo "candidate_uri=${CANDIDATE_URI}"
+            echo "release_uri=${RELEASE_URI}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "Release version: ${VERSION}"
+          echo "Release commit: ${COMMIT_SHA}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: github-production-${{ github.run_id }}
+
+      - name: Download candidate manifest
+        env:
+          COMMIT_SHA: ${{ steps.vars.outputs.commit_sha }}
+          CANDIDATE_URI: ${{ steps.vars.outputs.candidate_uri }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if ! aws s3 cp \
+            "${CANDIDATE_URI}" \
+            /tmp/candidate.json \
+            --only-show-errors; then
+
+            echo "::error::Candidate manifest가 없습니다."
+            echo "::error::Build Main Candidate Workflow를 먼저 확인하세요."
+            exit 1
+          fi
+
+          # Tag가 가리키는 commit과 Candidate commit이 같은지 검사한다.
+          jq -e \
+            --arg commit "${COMMIT_SHA}" \
+            '
+              .schemaVersion == 1 and
+              .kind == "KtbBoardReleaseCandidate" and
+              .candidateCommit == $commit and
+              (.components.spring.digest | startswith("sha256:")) and
+              (.components.express.digest | startswith("sha256:"))
+            ' \
+            /tmp/candidate.json \
+            >/dev/null
+
+          jq . /tmp/candidate.json
+
+      - name: Create release manifest
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          COMMIT_SHA: ${{ steps.vars.outputs.commit_sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          CREATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          # Candidate의 이미지 digest는 변경하지 않고
+          # Release 버전 정보만 추가한다.
+          jq \
+            --arg version "${VERSION}" \
+            --arg releaseCommit "${COMMIT_SHA}" \
+            --arg createdAt "${CREATED_AT}" \
+            '{
+              schemaVersion: 1,
+              kind: "KtbBoardRelease",
+              version: $version,
+              releaseCommit: $releaseCommit,
+              createdAt: $createdAt,
+              components: .components
+            }' \
+            /tmp/candidate.json \
+            > /tmp/release.json
+
+          jq . /tmp/release.json
+
+      - name: Store release manifest
+        env:
+          RELEASE_URI: ${{ steps.vars.outputs.release_uri }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          aws s3 cp \
+            /tmp/release.json \
+            "${RELEASE_URI}" \
+            --content-type "application/json" \
+            --only-show-errors
+
+          echo "Release manifest stored: ${RELEASE_URI}"
+
+      - name: Deploy production via SSM
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          RELEASE_URI: ${{ steps.vars.outputs.release_uri }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          DEPLOY_COMMAND="sudo /opt/ktb-board/bin/deploy.sh release ${RELEASE_URI}"
+
+          PARAMETERS="$(
+            jq -cn \
+              --arg command "${DEPLOY_COMMAND}" \
+              '{commands: [$command]}'
+          )"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --document-name "AWS-RunShellScript" \
+              --targets \
+                "Key=tag:Project,Values=ktb-board" \
+                "Key=tag:Role,Values=app" \
+                "Key=tag:Env,Values=prod" \
+              --parameters "${PARAMETERS}" \
+              --comment "Deploy ktb-board ${VERSION}" \
+              --timeout-seconds 900 \
+              --max-concurrency "1" \
+              --max-errors "0" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          echo "SSM Command ID: ${COMMAND_ID}"
+
+          # 모든 Production 인스턴스의 실행이 끝날 때까지 확인한다.
+          for attempt in {1..90}; do
+            STATUSES="$(
+              aws ssm list-command-invocations \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --query "CommandInvocations[].Status" \
+                --output text
+            )"
+
+            echo "Deployment status: ${STATUSES:-not-started}"
+
+            if echo "${STATUSES}" |
+              grep -Eq "Failed|Cancelled|TimedOut|Cancelling"; then
+
+              echo "::error::Production 배포에 실패했습니다."
+
+              aws ssm list-command-invocations \
+                --region "${AWS_REGION}" \
+                --command-id "${COMMAND_ID}" \
+                --details \
+                --output table || true
+
+              exit 1
+            fi
+
+            if [[ -n "${STATUSES}" ]] &&
+              ! echo "${STATUSES}" |
+                grep -Eq "Pending|InProgress|Delayed"; then
+
+              echo "Production deployment completed."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::Production 배포 확인 시간이 초과되었습니다."
+          exit 1

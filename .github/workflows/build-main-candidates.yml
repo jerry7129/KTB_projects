@@ -1,0 +1,411 @@
+name: Build Main Candidate
+
+on:
+  push:
+    branches:
+      - main
+
+  # 수동 실행은 두 이미지를 모두 다시 빌드한다.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ktb-board-main-candidate
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  AWS_ACCOUNT_ID: "180294193538"
+
+  BACKEND_ECR_REPOSITORY: ktb-board-spring
+  FRONTEND_ECR_REPOSITORY: ktb-board-express
+
+  MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
+  MANIFEST_PREFIX: ktb-board/manifests
+
+jobs:
+  # 변경된 컴포넌트를 감지한다.
+  prepare:
+    name: Detect Changes
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      backend: ${{ steps.plan.outputs.backend }}
+      frontend: ${{ steps.plan.outputs.frontend }}
+      previous_exists: ${{ steps.plan.outputs.previous_exists }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: github-candidate-prepare-${{ github.run_id }}
+
+      - name: Detect changed components
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          : "${MANIFEST_BUCKET:?RELEASE_MANIFEST_BUCKET is required}"
+
+          LATEST_KEY="${MANIFEST_PREFIX}/candidates/latest.json"
+
+          BACKEND_CHANGED=false
+          FRONTEND_CHANGED=false
+          PREVIOUS_EXISTS=false
+
+          # 이전 Candidate가 존재하면 변경되지 않은 컴포넌트의
+          # 이미지 digest를 이후 assemble Job에서 계승할 수 있다.
+          if aws s3api head-object \
+            --bucket "${MANIFEST_BUCKET}" \
+            --key "${LATEST_KEY}" \
+            >/dev/null 2>&1; then
+
+            PREVIOUS_EXISTS=true
+          fi
+
+          # 수동 실행 또는 최초 Candidate 생성이면
+          # 비교 대상이 없으므로 두 이미지를 모두 빌드한다.
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ||
+                "${PREVIOUS_EXISTS}" == "false" ||
+                -z "${BEFORE_SHA}" ||
+                "${BEFORE_SHA}" =~ ^0+$ ]]; then
+
+            BACKEND_CHANGED=true
+            FRONTEND_CHANGED=true
+          else
+            # 전체 Git history를 checkout하지 않고
+            # GitHub Compare API로 변경 파일을 조회한다.
+            CHANGED_FILES="$(
+              gh api \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/${GITHUB_REPOSITORY}/compare/${BEFORE_SHA}...${GITHUB_SHA}" \
+                --jq '.files[]?.filename'
+            )"
+
+            echo "Changed files:"
+
+            if [[ -n "${CHANGED_FILES}" ]]; then
+              printf '%s\n' "${CHANGED_FILES}"
+            else
+              echo "(none)"
+            fi
+
+            if grep -Eq '^backend/' <<< "${CHANGED_FILES}"; then
+              BACKEND_CHANGED=true
+            fi
+
+            if grep -Eq '^frontend/' <<< "${CHANGED_FILES}"; then
+              FRONTEND_CHANGED=true
+            fi
+
+            # CI, Compose, 배포 설정은 두 컴포넌트에 공통 영향을 줄 수 있다.
+            COMMON_PATTERN='^(\.github/workflows/build-main-candidate\.ya?ml$|(docker-)?compose(\.[^/]*)?\.ya?ml$|deploy/|scripts/deploy/)'
+
+            if grep -Eq "${COMMON_PATTERN}" <<< "${CHANGED_FILES}"; then
+              BACKEND_CHANGED=true
+              FRONTEND_CHANGED=true
+            fi
+          fi
+
+          {
+            echo "backend=${BACKEND_CHANGED}"
+            echo "frontend=${FRONTEND_CHANGED}"
+            echo "previous_exists=${PREVIOUS_EXISTS}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "Backend build: ${BACKEND_CHANGED}"
+          echo "Frontend build: ${FRONTEND_CHANGED}"
+          echo "Previous candidate: ${PREVIOUS_EXISTS}"
+
+  # Backend가 변경된 경우에만 Spring 이미지를 빌드한다.
+  build-backend:
+    name: Build Backend Image
+
+    needs:
+      - prepare
+
+    if: needs.prepare.outputs.backend == 'true'
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: github-backend-build-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_ECR_REPOSITORY }}:sha-${{ github.sha }}
+
+          cache-from: type=gha,scope=backend-main
+          cache-to: type=gha,mode=max,scope=backend-main
+
+  # Frontend가 변경된 경우에만 Express 이미지를 빌드한다.
+  build-frontend:
+    name: Build Frontend Image
+
+    needs:
+      - prepare
+
+    if: needs.prepare.outputs.frontend == 'true'
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: github-frontend-build-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push frontend
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/arm64
+          push: true
+
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPOSITORY }}:sha-${{ github.sha }}
+
+          cache-from: type=gha,scope=frontend-main
+          cache-to: type=gha,mode=max,scope=frontend-main
+
+  # 새로 빌드된 이미지와 이전 이미지를 조합해 Candidate를 만든다.
+  assemble-candidate:
+    name: Assemble Candidate Manifest
+
+    needs:
+      - prepare
+      - build-backend
+      - build-frontend
+
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.build-backend.result == 'success' ||
+       needs.build-backend.result == 'skipped') &&
+      (needs.build-frontend.result == 'success' ||
+       needs.build-frontend.result == 'skipped')
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: github-candidate-assemble-${{ github.run_id }}
+
+      - name: Create candidate manifest
+        env:
+          PREVIOUS_EXISTS: ${{ needs.prepare.outputs.previous_exists }}
+
+          BACKEND_BUILT: ${{ needs.prepare.outputs.backend }}
+          BACKEND_DIGEST: ${{ needs.build-backend.outputs.digest }}
+
+          FRONTEND_BUILT: ${{ needs.prepare.outputs.frontend }}
+          FRONTEND_DIGEST: ${{ needs.build-frontend.outputs.digest }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+          BACKEND_URI="${REGISTRY}/${BACKEND_ECR_REPOSITORY}"
+          FRONTEND_URI="${REGISTRY}/${FRONTEND_ECR_REPOSITORY}"
+
+          LATEST_URI="s3://${MANIFEST_BUCKET}/${MANIFEST_PREFIX}/candidates/latest.json"
+
+          PREVIOUS_FILE="/tmp/previous.json"
+          BACKEND_FILE="/tmp/backend.json"
+          FRONTEND_FILE="/tmp/frontend.json"
+          CANDIDATE_FILE="/tmp/candidate.json"
+
+          # 변경되지 않은 컴포넌트를 계승하기 위해
+          # 이전 Candidate manifest를 내려받는다.
+          if [[ "${PREVIOUS_EXISTS}" == "true" ]]; then
+            aws s3 cp \
+              "${LATEST_URI}" \
+              "${PREVIOUS_FILE}" \
+              --only-show-errors
+          fi
+
+          # Backend가 변경됐다면 새 digest로 정보를 생성한다.
+          # 변경되지 않았다면 이전 Candidate의 Spring 정보를 계승한다.
+          if [[ "${BACKEND_BUILT}" == "true" ]]; then
+            [[ "${BACKEND_DIGEST}" == sha256:* ]] || {
+              echo "::error::Invalid backend digest: ${BACKEND_DIGEST}"
+              exit 1
+            }
+
+            jq -n \
+              --arg repository "${BACKEND_ECR_REPOSITORY}" \
+              --arg repositoryUri "${BACKEND_URI}" \
+              --arg sourceCommit "${GITHUB_SHA}" \
+              --arg buildTag "sha-${GITHUB_SHA}" \
+              --arg digest "${BACKEND_DIGEST}" \
+              '{
+                repository: $repository,
+                repositoryUri: $repositoryUri,
+                sourceCommit: $sourceCommit,
+                buildTag: $buildTag,
+                digest: $digest,
+                image: ($repositoryUri + "@" + $digest)
+              }' > "${BACKEND_FILE}"
+          else
+            jq -e \
+              '.components.spring' \
+              "${PREVIOUS_FILE}" \
+              > "${BACKEND_FILE}"
+          fi
+
+          # Frontend도 동일한 방식으로 새 digest 또는 이전 정보를 사용한다.
+          if [[ "${FRONTEND_BUILT}" == "true" ]]; then
+            [[ "${FRONTEND_DIGEST}" == sha256:* ]] || {
+              echo "::error::Invalid frontend digest: ${FRONTEND_DIGEST}"
+              exit 1
+            }
+
+            jq -n \
+              --arg repository "${FRONTEND_ECR_REPOSITORY}" \
+              --arg repositoryUri "${FRONTEND_URI}" \
+              --arg sourceCommit "${GITHUB_SHA}" \
+              --arg buildTag "sha-${GITHUB_SHA}" \
+              --arg digest "${FRONTEND_DIGEST}" \
+              '{
+                repository: $repository,
+                repositoryUri: $repositoryUri,
+                sourceCommit: $sourceCommit,
+                buildTag: $buildTag,
+                digest: $digest,
+                image: ($repositoryUri + "@" + $digest)
+              }' > "${FRONTEND_FILE}"
+          else
+            jq -e \
+              '.components.express' \
+              "${PREVIOUS_FILE}" \
+              > "${FRONTEND_FILE}"
+          fi
+
+          CREATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          jq -n \
+            --arg candidateCommit "${GITHUB_SHA}" \
+            --arg createdAt "${CREATED_AT}" \
+            --slurpfile spring "${BACKEND_FILE}" \
+            --slurpfile express "${FRONTEND_FILE}" \
+            '{
+              schemaVersion: 1,
+              kind: "KtbBoardReleaseCandidate",
+              candidateCommit: $candidateCommit,
+              createdAt: $createdAt,
+              components: {
+                spring: $spring[0],
+                express: $express[0]
+              }
+            }' > "${CANDIDATE_FILE}"
+
+          jq . "${CANDIDATE_FILE}"
+
+      - name: Store candidate manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          EXACT_URI="s3://${MANIFEST_BUCKET}/${MANIFEST_PREFIX}/candidates/${GITHUB_SHA}.json"
+          LATEST_URI="s3://${MANIFEST_BUCKET}/${MANIFEST_PREFIX}/candidates/latest.json"
+
+          # Commit별 Candidate
+          aws s3 cp \
+            /tmp/candidate.json \
+            "${EXACT_URI}" \
+            --content-type "application/json" \
+            --only-show-errors
+
+          # 다음 main build에서 변경되지 않은 컴포넌트를 계승하기 위한 pointer
+          aws s3 cp \
+            /tmp/candidate.json \
+            "${LATEST_URI}" \
+            --content-type "application/json" \
+            --cache-control "no-store" \
+            --only-show-errors
+
+          echo "Candidate manifest stored: ${EXACT_URI}"
