@@ -7,7 +7,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.context.annotation.PropertySource;
 
-@ActiveProfiles("development")
+@ActiveProfiles("test")
 @TestPropertySource(properties = {
     "DB_USERNAME=springbootuser",
     "DB_PASSWORD=springboot030928",
