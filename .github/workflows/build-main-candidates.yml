@@ -135,111 +135,293 @@ jobs:
 
   # Backend가 변경된 경우에만 Spring 이미지를 빌드한다.
   build-backend:
-    name: Build Backend Image
+    name: Build Backend (${{ matrix.arch }})
 
     needs:
       - prepare
 
     if: needs.prepare.outputs.backend == 'true'
 
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
 
     permissions:
       contents: read
       id-token: write
 
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
-          role-session-name: github-backend-build-${{ github.run_id }}
+          role-session-name: backend-${{ matrix.arch }}-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+
+          # 각 Runner는 자신의 CPU 아키텍처만 빌드한다.
+          platforms: ${{ matrix.platform }}
+          push: true
+
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:sha-${{ github.sha }}-${{ matrix.arch }}
+
+          cache-from: |
+            type=gha,scope=backend-main-${{ matrix.arch }}
+
+          cache-to: |
+            type=gha,mode=max,scope=backend-main-${{ matrix.arch }}
+
+          # 플랫폼 태그를 단순한 단일 이미지 manifest로 유지한다.
+          provenance: false
+          sbom: false
+
+  # Backend arm64와 amd64 이미지를 조합해 Multi-Arch manifest를 생성
+  merge-backend:
+    name: Create Backend Multi-Arch Image
+
+    needs:
+      - prepare
+      - build-backend
+
+    if: |
+      needs.prepare.outputs.backend == 'true' &&
+      needs.build-backend.result == 'success'
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      digest: ${{ steps.manifest.outputs.digest }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: backend-merge-${{ github.run_id }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Build and push backend
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          platforms: linux/arm64
-          push: true
+      - name: Create backend manifest
+        id: manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
 
-          tags: |
-            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.BACKEND_ECR_REPOSITORY }}:sha-${{ github.sha }}
+          REPOSITORY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${BACKEND_ECR_REPOSITORY}"
+          FINAL_TAG="sha-${GITHUB_SHA}"
 
-          cache-from: type=gha,scope=backend-main
-          cache-to: type=gha,mode=max,scope=backend-main
+          AMD64_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}-amd64"
+          ARM64_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}-arm64"
+          FINAL_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}"
+
+          docker buildx imagetools create \
+            --tag "${FINAL_IMAGE}" \
+            "${AMD64_IMAGE}" \
+            "${ARM64_IMAGE}"
+
+          docker buildx imagetools inspect "${FINAL_IMAGE}"
+
+          DIGEST="$(
+            aws ecr describe-images \
+              --region "${AWS_REGION}" \
+              --repository-name "${BACKEND_ECR_REPOSITORY}" \
+              --image-ids "imageTag=${FINAL_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text
+          )"
+
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Invalid backend manifest digest: ${DIGEST}"
+            exit 1
+          fi
+
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "Backend manifest digest: ${DIGEST}"
 
   # Frontend가 변경된 경우에만 Express 이미지를 빌드한다.
   build-frontend:
-    name: Build Frontend Image
+    name: Build Frontend (${{ matrix.arch }})
 
     needs:
       - prepare
 
     if: needs.prepare.outputs.frontend == 'true'
 
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
 
     permissions:
       contents: read
       id-token: write
 
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
-          role-session-name: github-frontend-build-${{ github.run_id }}
+          role-session-name: frontend-${{ matrix.arch }}-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+
+          platforms: ${{ matrix.platform }}
+          push: true
+
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:sha-${{ github.sha }}-${{ matrix.arch }}
+
+          cache-from: |
+            type=gha,scope=frontend-main-${{ matrix.arch }}
+
+          cache-to: |
+            type=gha,mode=max,scope=frontend-main-${{ matrix.arch }}
+
+          provenance: false
+          sbom: false
+
+  # Frontend arm64와 amd64 이미지를 조합해 Multi-Arch manifest를 생성
+  merge-frontend:
+    name: Create Frontend Multi-Arch Image
+
+    needs:
+      - prepare
+      - build-frontend
+
+    if: |
+      needs.prepare.outputs.frontend == 'true' &&
+      needs.build-frontend.result == 'success'
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      digest: ${{ steps.manifest.outputs.digest }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          role-session-name: frontend-merge-${{ github.run_id }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Build and push frontend
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          platforms: linux/arm64
-          push: true
+      - name: Create frontend manifest
+        id: manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
 
-          tags: |
-            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.FRONTEND_ECR_REPOSITORY }}:sha-${{ github.sha }}
+          REPOSITORY_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${FRONTEND_ECR_REPOSITORY}"
+          FINAL_TAG="sha-${GITHUB_SHA}"
 
-          cache-from: type=gha,scope=frontend-main
-          cache-to: type=gha,mode=max,scope=frontend-main
+          AMD64_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}-amd64"
+          ARM64_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}-arm64"
+          FINAL_IMAGE="${REPOSITORY_URI}:${FINAL_TAG}"
+
+          docker buildx imagetools create \
+            --tag "${FINAL_IMAGE}" \
+            "${AMD64_IMAGE}" \
+            "${ARM64_IMAGE}"
+
+          docker buildx imagetools inspect "${FINAL_IMAGE}"
+
+          DIGEST="$(
+            aws ecr describe-images \
+              --region "${AWS_REGION}" \
+              --repository-name "${FRONTEND_ECR_REPOSITORY}" \
+              --image-ids "imageTag=${FINAL_TAG}" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text
+          )"
+
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Invalid frontend manifest digest: ${DIGEST}"
+            exit 1
+          fi
+
+          echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+          echo "Frontend manifest digest: ${DIGEST}"
 
   # 새로 빌드된 이미지와 이전 이미지를 조합해 Candidate를 만든다.
   assemble-candidate:
@@ -247,16 +429,20 @@ jobs:
 
     needs:
       - prepare
-      - build-backend
-      - build-frontend
+      - merge-backend
+      - merge-frontend
 
     if: |
       always() &&
       needs.prepare.result == 'success' &&
-      (needs.build-backend.result == 'success' ||
-       needs.build-backend.result == 'skipped') &&
-      (needs.build-frontend.result == 'success' ||
-       needs.build-frontend.result == 'skipped')
+      (
+        needs.merge-backend.result == 'success' ||
+        needs.merge-backend.result == 'skipped'
+      ) &&
+      (
+        needs.merge-frontend.result == 'success' ||
+        needs.merge-frontend.result == 'skipped'
+      )
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -276,13 +462,13 @@ jobs:
 
       - name: Create candidate manifest
         env:
-          PREVIOUS_EXISTS: ${{ needs.prepare.outputs.previous_exists }}
+            PREVIOUS_EXISTS: ${{ needs.prepare.outputs.previous_exists }}
 
-          BACKEND_BUILT: ${{ needs.prepare.outputs.backend }}
-          BACKEND_DIGEST: ${{ needs.build-backend.outputs.digest }}
+            BACKEND_BUILT: ${{ needs.prepare.outputs.backend }}
+            BACKEND_DIGEST: ${{ needs.merge-backend.outputs.digest }}
 
-          FRONTEND_BUILT: ${{ needs.prepare.outputs.frontend }}
-          FRONTEND_DIGEST: ${{ needs.build-frontend.outputs.digest }}
+            FRONTEND_BUILT: ${{ needs.prepare.outputs.frontend }}
+            FRONTEND_DIGEST: ${{ needs.merge-frontend.outputs.digest }}
         shell: bash
         run: |
           set -Eeuo pipefail
