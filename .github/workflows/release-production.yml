@@ -15,7 +15,6 @@ on:
 permissions:
   contents: read
 
-# Production 배포가 동시에 두 개 실행되지 않도록 막는다.
 concurrency:
   group: ktb-board-production
   cancel-in-progress: false
@@ -24,6 +23,9 @@ env:
   AWS_REGION: ap-northeast-2
   AWS_ACCOUNT_ID: "180294193538"
 
+  BACKEND_ECR_REPOSITORY: ktb-board-spring
+  FRONTEND_ECR_REPOSITORY: ktb-board-express
+
   MANIFEST_BUCKET: ${{ vars.RELEASE_MANIFEST_BUCKET }}
   MANIFEST_PREFIX: ktb-board/manifests
 
@@ -31,10 +33,9 @@ jobs:
   release:
     name: Release to Production
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
-    # GitHub Environment의 승인 규칙과 Secret을 사용한다.
     environment: production
 
     permissions:
@@ -42,14 +43,13 @@ jobs:
       id-token: write
 
     steps:
-      # 전체 Git history는 필요 없고,
-      # Git tag를 조회하기 위한 최소한의 저장소 정보만 받는다.
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
           persist-credentials: false
 
+      # Git tag와 해당 tag가 가리키는 commit을 확인한다.
       - name: Prepare release metadata
         id: vars
         env:
@@ -65,15 +65,12 @@ jobs:
             VERSION="${GITHUB_REF_NAME}"
           fi
 
-          # 과제에서는 major.minor.patch 형식만 허용한다.
           if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::잘못된 버전입니다: ${VERSION}"
             echo "::error::예시: v1.0.0"
             exit 1
           fi
 
-          # Lightweight tag와 Annotated tag를 모두 처리할 수 있도록
-          # 해당 tag만 별도로 fetch한다.
           git fetch \
             origin \
             "refs/tags/${VERSION}:refs/tags/${VERSION}" \
@@ -95,7 +92,7 @@ jobs:
               "refs/tags/${VERSION}"
           )"
 
-          # 태그 commit이 main에 포함된 commit인지 확인한다.
+          # COMMIT_SHA가 main과 같거나 main의 과거 commit인지 확인한다.
           COMPARE_STATUS="$(
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -124,6 +121,7 @@ jobs:
 
           echo "Release version: ${VERSION}"
           echo "Release commit: ${COMMIT_SHA}"
+          echo "Candidate URI: ${CANDIDATE_URI}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -133,13 +131,23 @@ jobs:
           allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
           role-session-name: github-production-${{ github.run_id }}
 
-      - name: Download candidate manifest
+      # Private ECR의 manifest를 inspect하기 위해 Docker 로그인이 필요하다.
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Candidate manifest의 commit, repository, image, digest 관계를 검증한다.
+      - name: Download and validate candidate
         env:
           COMMIT_SHA: ${{ steps.vars.outputs.commit_sha }}
           CANDIDATE_URI: ${{ steps.vars.outputs.candidate_uri }}
         shell: bash
         run: |
           set -Eeuo pipefail
+
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
           if ! aws s3 cp \
             "${CANDIDATE_URI}" \
@@ -151,21 +159,208 @@ jobs:
             exit 1
           fi
 
-          # Tag가 가리키는 commit과 Candidate commit이 같은지 검사한다.
           jq -e \
             --arg commit "${COMMIT_SHA}" \
+            --arg registry "${REGISTRY}" \
+            --arg backendRepository "${BACKEND_ECR_REPOSITORY}" \
+            --arg frontendRepository "${FRONTEND_ECR_REPOSITORY}" \
             '
               .schemaVersion == 1 and
               .kind == "KtbBoardReleaseCandidate" and
               .candidateCommit == $commit and
-              (.components.spring.digest | startswith("sha256:")) and
-              (.components.express.digest | startswith("sha256:"))
+
+              .components.spring.repository ==
+                $backendRepository and
+
+              (
+                .components.spring.digest |
+                type == "string" and
+                test("^sha256:[0-9a-f]{64}$")
+              ) and
+
+              (
+                .components.spring.image ==
+                (
+                  $registry +
+                  "/" +
+                  $backendRepository +
+                  "@" +
+                  .components.spring.digest
+                )
+              ) and
+
+              .components.express.repository ==
+                $frontendRepository and
+
+              (
+                .components.express.digest |
+                type == "string" and
+                test("^sha256:[0-9a-f]{64}$")
+              ) and
+
+              (
+                .components.express.image ==
+                (
+                  $registry +
+                  "/" +
+                  $frontendRepository +
+                  "@" +
+                  .components.express.digest
+                )
+              )
             ' \
             /tmp/candidate.json \
             >/dev/null
 
           jq . /tmp/candidate.json
 
+      # 각 Candidate digest가 실제 multi-architecture manifest인지 검사한다.
+      - name: Verify multi-architecture images
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          SPRING_IMAGE="$(
+            jq -r \
+              '.components.spring.image' \
+              /tmp/candidate.json
+          )"
+
+          EXPRESS_IMAGE="$(
+            jq -r \
+              '.components.express.image' \
+              /tmp/candidate.json
+          )"
+
+          verify_multiarch() {
+            local component="$1"
+            local image="$2"
+            local manifest_file="/tmp/${component}-manifest.json"
+
+            echo "Inspecting ${component}: ${image}"
+
+            docker buildx imagetools inspect \
+              --raw \
+              "${image}" \
+              > "${manifest_file}"
+
+            if ! jq -e \
+              '
+                .schemaVersion == 2 and
+
+                (
+                  .mediaType ==
+                    "application/vnd.docker.distribution.manifest.list.v2+json"
+                  or
+                  .mediaType ==
+                    "application/vnd.oci.image.index.v1+json"
+                ) and
+
+                any(
+                  .manifests[]?;
+                  .platform.os == "linux" and
+                  .platform.architecture == "amd64"
+                ) and
+
+                any(
+                  .manifests[]?;
+                  .platform.os == "linux" and
+                  .platform.architecture == "arm64"
+                )
+              ' \
+              "${manifest_file}" \
+              >/dev/null; then
+
+              echo "::error::${component} image는 amd64와 arm64를 모두 포함해야 합니다."
+              jq . "${manifest_file}" || true
+              exit 1
+            fi
+
+            echo "${component} supported platforms:"
+
+            jq -r \
+              '.manifests[] |
+               select(.platform.os != null) |
+               "  - \(.platform.os)/\(.platform.architecture)"' \
+              "${manifest_file}"
+          }
+
+          verify_multiarch \
+            "spring" \
+            "${SPRING_IMAGE}"
+
+          verify_multiarch \
+            "express" \
+            "${EXPRESS_IMAGE}"
+
+      # Candidate를 다시 빌드하지 않고 Release tag를 추가
+      - name: Add release tags to multi-architecture images
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+          SPRING_IMAGE="$(
+            jq -r '.components.spring.image' /tmp/candidate.json
+          )"
+
+          EXPRESS_IMAGE="$(
+            jq -r '.components.express.image' /tmp/candidate.json
+          )"
+
+          SPRING_DIGEST="$(
+            jq -r '.components.spring.digest' /tmp/candidate.json
+          )"
+
+          EXPRESS_DIGEST="$(
+            jq -r '.components.express.digest' /tmp/candidate.json
+          )"
+
+          promote() {
+            local repository="$1"
+            local source_image="$2"
+            local expected_digest="$3"
+
+            local target_image="${REGISTRY}/${repository}:${VERSION}"
+
+            echo "Promoting ${source_image}"
+            echo "Target: ${target_image}"
+
+            docker buildx imagetools create \
+              --tag "${target_image}" \
+              "${source_image}"
+
+            actual_digest="$(
+              aws ecr describe-images \
+                --region "${AWS_REGION}" \
+                --repository-name "${repository}" \
+                --image-ids "imageTag=${VERSION}" \
+                --query 'imageDetails[0].imageDigest' \
+                --output text
+            )"
+
+            if [[ "${actual_digest}" != "${expected_digest}" ]]; then
+              echo "::error::Promoted digest does not match."
+              echo "::error::Expected: ${expected_digest}"
+              echo "::error::Actual:   ${actual_digest}"
+              exit 1
+            fi
+          }
+
+          promote \
+            "${BACKEND_ECR_REPOSITORY}" \
+            "${SPRING_IMAGE}" \
+            "${SPRING_DIGEST}"
+
+          promote \
+            "${FRONTEND_ECR_REPOSITORY}" \
+            "${EXPRESS_IMAGE}" \
+            "${EXPRESS_DIGEST}"
+
+      # Candidate를 다시 빌드하지 않고 Release metadata만 추가한다.
       - name: Create release manifest
         env:
           VERSION: ${{ steps.vars.outputs.version }}
@@ -176,8 +371,6 @@ jobs:
 
           CREATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
-          # Candidate의 이미지 digest는 변경하지 않고
-          # Release 버전 정보만 추가한다.
           jq \
             --arg version "${VERSION}" \
             --arg releaseCommit "${COMMIT_SHA}" \
@@ -245,7 +438,6 @@ jobs:
 
           echo "SSM Command ID: ${COMMAND_ID}"
 
-          # 모든 Production 인스턴스의 실행이 끝날 때까지 확인한다.
           for attempt in {1..90}; do
             STATUSES="$(
               aws ssm list-command-invocations \
