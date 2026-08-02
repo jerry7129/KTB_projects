@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ktb-board-root
+  namespace: argocd
+
+spec:
+  # ktb-board 프로젝트는 argocd-apps 차트가 생성하므로
+  # 부모 Application은 기본 프로젝트를 사용한다.
+  project: default
+
+  source:
+    repoURL: https://github.com/jerry7129/KTB_projects.git
+    targetRevision: main
+    path: argocd-apps
+
+    helm:
+      releaseName: ktb-board-argocd-apps
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - PruneLast=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
