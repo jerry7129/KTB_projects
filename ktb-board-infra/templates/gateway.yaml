@@ -170,7 +170,7 @@ spec:
             kind: HTTPRoute
     {{- end }}
 
-        {{- if .Values.gateway.listeners.argocdHttps.enabled }}
+    {{- if .Values.gateway.listeners.argocdHttps.enabled }}
     - name: {{ .Values.gateway.listeners.argocdHttps.name | quote }}
       protocol: {{ .Values.gateway.listeners.argocdHttps.protocol | quote }}
       port: {{ .Values.gateway.listeners.argocdHttps.port }}
