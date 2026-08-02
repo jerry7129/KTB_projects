@@ -1,0 +1,49 @@
+{{- if .Values.targetGroup.enabled }}
+
+{{- $targetGroupConfigName := default
+      (printf "%s-target-group-config" (include "ktb-board-spring.fullname" .))
+      .Values.targetGroup.name
+-}}
+
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+
+metadata:
+  name: {{ $targetGroupConfigName | quote }}
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    environment: {{ .Values.environment | quote }}
+
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: {{ printf "%s-service" (include "ktb-board-spring.fullname" .) | quote }}
+
+  defaultConfiguration:
+    targetType: {{ .Values.targetGroup.targetType | quote }}
+    protocol: {{ .Values.targetGroup.protocol | quote }}
+    protocolVersion: {{ .Values.targetGroup.protocolVersion | quote }}
+
+    healthCheckConfig:
+      healthCheckProtocol: {{ .Values.targetGroup.healthCheck.protocol | quote }}
+      healthCheckPath: {{ .Values.targetGroup.healthCheck.path | quote }}
+
+      {{- with .Values.targetGroup.healthCheck.port }}
+      healthCheckPort: {{ . | quote }}
+      {{- end }}
+
+      healthCheckInterval: {{ .Values.targetGroup.healthCheck.intervalSeconds }}
+      healthCheckTimeout: {{ .Values.targetGroup.healthCheck.timeoutSeconds }}
+      healthyThresholdCount: {{ .Values.targetGroup.healthCheck.healthyThresholdCount }}
+      unhealthyThresholdCount: {{ .Values.targetGroup.healthCheck.unhealthyThresholdCount }}
+
+      matcher:
+        httpCode: {{ .Values.targetGroup.healthCheck.matcher.httpCode | quote }}
+
+    {{- with .Values.targetGroup.tags }}
+    tags:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+{{- end }}

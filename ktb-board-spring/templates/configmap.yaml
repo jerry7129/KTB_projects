@@ -1,0 +1,15 @@
+{{- if .Values.config.create }}
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: {{ include "ktb-board-spring.fullname" . }}-config
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    environment: {{ .Values.environment | quote }}
+
+data:
+  {{- range $key, $value := .Values.config.data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

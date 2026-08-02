@@ -1,0 +1,81 @@
+{{- if .Values.httpRoute.enabled }}
+
+{{- $fullname := include "ktb-board-spring.fullname" . -}}
+
+{{- $backendRouteName := default
+      (printf "%s-route" $fullname)
+      .Values.httpRoute.backend.name
+-}}
+
+{{- $redirectRouteName := default
+      (printf "%s-http-redirect" $fullname)
+      .Values.httpRoute.redirect.name
+-}}
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+
+metadata:
+  name: {{ $backendRouteName | quote }}
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    environment: {{ .Values.environment | quote }}
+
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httpRoute.gateway.name | quote }}
+      namespace: {{ .Values.httpRoute.gateway.namespace | quote }}
+      sectionName: {{ .Values.httpRoute.gateway.listener.https | quote }}
+
+  hostnames:
+    {{- toYaml .Values.httpRoute.hostnames | nindent 4 }}
+
+  rules:
+    - matches:
+        - path:
+            type: {{ .Values.httpRoute.backend.path.type }}
+            value: {{ .Values.httpRoute.backend.path.value | quote }}
+
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ printf "%s-service" $fullname | quote }}
+          port: {{ .Values.service.port }}
+          weight: 1
+
+{{- if .Values.httpRoute.redirect.enabled }}
+
+---
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+
+metadata:
+  name: {{ $redirectRouteName | quote }}
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    environment: {{ .Values.environment | quote }}
+
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httpRoute.gateway.name | quote }}
+      namespace: {{ .Values.httpRoute.gateway.namespace | quote }}
+      sectionName: {{ .Values.httpRoute.gateway.listener.http | quote }}
+
+  hostnames:
+    {{- toYaml .Values.httpRoute.hostnames | nindent 4 }}
+
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: {{ .Values.httpRoute.redirect.scheme | quote }}
+            port: {{ .Values.httpRoute.redirect.port }}
+            statusCode: {{ .Values.httpRoute.redirect.statusCode }}
+
+{{- end }}
+{{- end }}

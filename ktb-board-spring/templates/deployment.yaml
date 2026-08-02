@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ include "ktb-board-spring.deploymentName" . | quote }}
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    environment: {{ .Values.environment | quote }}
+
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  
+  strategy:
+    type: {{ .Values.deployment.strategy.type }}
+    rollingUpdate:
+      maxSurge: {{ .Values.deployment.strategy.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.deployment.strategy.rollingUpdate.maxUnavailable }}
+
+  selector:
+    matchLabels:
+      {{- include "ktb-board-spring.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "ktb-board-spring.selectorLabels" . | nindent 8 }}
+        environment: {{ .Values.environment | quote }}
+
+    spec:
+      serviceAccountName: {{ include "ktb-board-spring.serviceAccountName" . | quote }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Values.container.name }}
+
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: {{ .Values.container.portName }}
+              containerPort: {{ .Values.container.port }}
+              protocol: TCP
+
+          envFrom:
+            {{- if .Values.config.create }}
+            - configMapRef:
+                name: {{ include "ktb-board-spring.fullname" . }}-config
+            {{- end }}
+
+            - secretRef:
+                name: {{ required "secret.existingSecret 값을 지정해야 합니다." .Values.secret.existingSecret }}
+
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.httpGet.path | quote }}
+              port: {{ .Values.probes.startup.httpGet.port }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            successThreshold: {{ .Values.probes.startup.successThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.probes.liveness.tcpSocket.port }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            successThreshold: {{ .Values.probes.liveness.successThreshold }}
+          {{- end }}
+
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.httpGet.path | quote }}
+              port: {{ .Values.probes.readiness.httpGet.port }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+            successThreshold: {{ .Values.probes.readiness.successThreshold }}
+          {{- end }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

@@ -1,0 +1,233 @@
+replicaCount: 2
+
+image:
+  repository: 180294193538.dkr.ecr.ap-northeast-2.amazonaws.com/ktb-board-spring
+  pullPolicy: IfNotPresent
+  tag: "v1.0.1"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  automount: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+deployment:
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+container:
+  name: spring-container
+  port: 8080
+  portName: http
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: http
+
+  # 비워 두면 Kubernetes가 30000~32767 범위에서 자동 할당
+  nodePort: null
+  annotations: {}
+
+config:
+  create: true
+  data:
+    SPRING_PROFILES_ACTIVE: "prod"
+
+secret:
+  create: false
+  existingSecret: spring-secret
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1200Mi
+
+probes:
+  startup:
+    enabled: true
+    type: httpGet
+    httpGet:
+      path: /api/health
+      port: http
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 12
+    successThreshold: 1
+
+  liveness:
+    enabled: true
+    type: tcpSocket
+    tcpSocket:
+      port: http
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+    successThreshold: 1
+
+  readiness:
+    enabled: true
+    type: httpGet
+    httpGet:
+      path: /api/health
+      port: http
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 2
+    successThreshold: 1
+
+httpRoute:
+  enabled: true
+
+  # 비워 두면 <fullname>-route 사용
+  name: ""
+
+  gateway:
+    name: ktb-board-gateway
+    namespace: gateway-system
+
+    listener:
+      http: http
+      https: https
+
+  hostnames:
+    - board.steven-project.store
+
+  backend:
+    # 비워 두면 <fullname>-route
+    name: ""
+
+    path:
+      type: PathPrefix
+      value: /api
+
+  redirect:
+    enabled: true
+
+    # 비워 두면 <fullname>-http-redirect
+    name: ""
+
+    scheme: https
+    port: 443
+    statusCode: 301
+
+targetGroup:
+  enabled: true
+
+  # 비워 두면 <fullname>-target-group-config 사용
+  name: ""
+
+  targetType: instance
+  protocol: HTTP
+  protocolVersion: HTTP1
+
+  healthCheck:
+    protocol: HTTP
+    path: /api/health
+
+    # 비워 두면 실제 Target Group의 트래픽 포트,
+    # 즉 자동 할당된 NodePort를 사용
+    port: ""
+
+    intervalSeconds: 15
+    timeoutSeconds: 5
+    healthyThresholdCount: 2
+    unhealthyThresholdCount: 2
+
+    matcher:
+      httpCode: "200"
+
+  tags:
+    Project: ktb-board
+    Component: spring
+
+serviceAccount:
+  create: true
+
+  # 비워 두면 <fullname>-sa 사용
+  # 현재는 ktb-board-spring-sa
+  name: ""
+
+  annotations: {}
+
+  # Spring 애플리케이션이 Kubernetes API를 사용하지 않으므로
+  # ServiceAccount Token을 Pod에 마운트하지 않음
+  automount: false
+
+autoscaling:
+  enabled: true
+
+  # 비워 두면 <fullname>-hpa 사용
+  # 현재는 ktb-board-spring-hpa
+  name: ""
+
+  minReplicas: 1
+  maxReplicas: 2
+
+  metrics:
+    cpu:
+      enabled: true
+      averageUtilization: 70
+
+    memory:
+      enabled: false
+      averageUtilization: 75
+
+  behavior:
+    scaleUp:
+      # 부하 증가 시 즉시 확장 판단
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        # 현재 Pod 수의 최대 100%까지 60초마다 증가
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+
+        # 한 번에 최대 1개씩 증가
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+
+    scaleDown:
+      # 일시적인 부하 감소로 바로 축소되지 않도록 5분 대기
+      stabilizationWindowSeconds: 300
+      selectPolicy: Min
+      policies:
+        # 한 번에 최대 50% 축소
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+        # 실제로는 한 번에 최대 1개씩 축소
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+
+serviceMonitor:
+  enabled: true
+  componentLabel: spring
+  port: http
+  path: /api/actuator/prometheus
+  interval: 30s
+  scrapeTimeout: 10s
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
