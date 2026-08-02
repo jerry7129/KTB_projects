@@ -19,7 +19,7 @@ spec:
 
   destination:
     server: {{ $.Values.destination.server | quote }}
-    namespace: {{ $.Values.destination.namespace | quote }}
+    namespace: {{ .destinationNamespace | quote }}
 
   syncPolicy:
     {{- if .sync.automated }}

@@ -6,7 +6,7 @@ gatewayClass:
 loadBalancer:
   enabled: true
   name: ktb-board-alb-config
-  loadBalancerName: ""
+  loadBalancerName: "ktb-board-alb"
   scheme: internet-facing
   ipAddressType: ipv4
 
@@ -17,7 +17,7 @@ loadBalancer:
     - subnet-09b8e1367c9dee3e6
     - subnet-029d3fd6f1d126321
 
-  secrutiyGroups:
+  securityGroups:
     - sg-0416ebc9aeaefb74d
 
   manageBackendSecurityGroupRules: true
@@ -26,7 +26,7 @@ loadBalancer:
 
   tags:
     Project: ktb-board
-    ManagedBy: helm
+    ManagedBy: argocd
 
 gateway:
   enabled: true

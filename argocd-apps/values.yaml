@@ -4,7 +4,6 @@ repository:
 
 destination:
   server: https://kubernetes.default.svc
-  namespace: default
 
 project:
   name: ktb-board
@@ -49,6 +48,7 @@ applications:
     enabled: true
     path: ktb-board-infra
     releaseName: ktb-board-infra
+    destinationNamespace: gateway-system
 
     sync:
       automated: false
@@ -59,6 +59,7 @@ applications:
     enabled: false
     path: ktb-board-spring
     releaseName: ktb-board-spring
+    destinationNamespace: default
 
     sync:
       automated: false
@@ -69,6 +70,7 @@ applications:
     enabled: false
     path: ktb-board-express
     releaseName: ktb-board-express
+    destinationNamespace: default
 
     sync:
       automated: false

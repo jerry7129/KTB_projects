@@ -3,6 +3,7 @@ apiVersion: gateway.k8s.aws/v1beta1
 kind: LoadBalancerConfiguration
 metadata:
   name: {{ .Values.loadBalancer.name | quote }}
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "ktb-board-infra.labels" . | nindent 4 }}
   annotations:

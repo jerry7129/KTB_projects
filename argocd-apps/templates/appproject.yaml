@@ -11,7 +11,10 @@ spec:
 
   destinations:
     - server: {{ .Values.destination.server | quote }}
-      namespace: {{ .Values.destination.namespace | quote }}
+      namespace: "gateway-system"
+
+    - server: {{ .Values.destination.server | quote }}
+      namespace: "default"
 
   clusterResourceWhitelist:
     {{- range .Values.project.clusterResourceWhitelist }}
