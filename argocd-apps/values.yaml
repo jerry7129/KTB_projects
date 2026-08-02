@@ -59,7 +59,7 @@ applications:
     destinationNamespace: gateway-system
 
     sync:
-      automated: false
+      automated: true
       prune: false
       selfHeal: true
 
@@ -70,8 +70,8 @@ applications:
     destinationNamespace: default
 
     sync:
-      automated: false
-      prune: false
+      automated: true
+      prune: true
       selfHeal: true
 
   - name: ktb-board-express
@@ -81,6 +81,6 @@ applications:
     destinationNamespace: default
 
     sync:
-      automated: false
-      prune: false
+      automated: true
+      prune: true
       selfHeal: true
