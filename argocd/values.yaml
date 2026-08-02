@@ -89,3 +89,24 @@ argo-cd:
   # Slack, 이메일 알림을 붙일 때 활성화
   notifications:
     enabled: false
+
+exposure:
+  enabled: true
+
+  hostname: argocd.steven-project.store
+
+  gateway:
+    name: ktb-board-gateway
+    namespace: gateway-system
+    httpSectionName: argocd-http
+    httpsSectionName: argocd-https
+
+  service:
+    name: argocd-server
+    port: 80
+
+  targetGroup:
+    enabled: true
+    name: argocd-server-target-group-config
+    targetType: instance
+    healthCheckPath: /healthz

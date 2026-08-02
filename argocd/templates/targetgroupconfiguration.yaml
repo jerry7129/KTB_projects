@@ -1,0 +1,29 @@
+{{- if and
+      .Values.exposure.enabled
+      .Values.exposure.targetGroup.enabled
+}}
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+metadata:
+  name: {{ .Values.exposure.targetGroup.name | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: server
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: {{ .Values.exposure.service.name | quote }}
+
+  defaultConfiguration:
+    targetType: {{ .Values.exposure.targetGroup.targetType | quote }}
+
+    healthCheckConfig:
+      healthCheckProtocol: HTTP
+      healthCheckPath: {{ .Values.exposure.targetGroup.healthCheckPath | quote }}
+      matcher:
+        httpCode: "200"
+{{- end }}

@@ -5,6 +5,8 @@
       .Values.gateway.listeners.grafanaHttps.enabled
       .Values.gateway.listeners.portainerHttp.enabled
       .Values.gateway.listeners.portainerHttps.enabled
+      .Values.gateway.listeners.argocdHttp.enabled
+      .Values.gateway.listeners.argocdHttps.enabled
 ) }}
 {{- fail "gateway.listeners 중 하나 이상을 활성화해야 합니다." }}
 {{- end }}
@@ -128,6 +130,52 @@ spec:
       port: {{ .Values.gateway.listeners.portainerHttps.port }}
 
       {{- with .Values.gateway.listeners.portainerHttps.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.argocdHttp.enabled }}
+    - name: {{ .Values.gateway.listeners.argocdHttp.name | quote }}
+      protocol: {{ .Values.gateway.listeners.argocdHttp.protocol | quote }}
+      port: {{ .Values.gateway.listeners.argocdHttp.port }}
+
+      {{- with .Values.gateway.listeners.argocdHttp.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+        {{- if .Values.gateway.listeners.argocdHttps.enabled }}
+    - name: {{ .Values.gateway.listeners.argocdHttps.name | quote }}
+      protocol: {{ .Values.gateway.listeners.argocdHttps.protocol | quote }}
+      port: {{ .Values.gateway.listeners.argocdHttps.port }}
+
+      {{- with .Values.gateway.listeners.argocdHttps.hostname }}
       hostname: {{ . | quote }}
       {{- end }}
 
