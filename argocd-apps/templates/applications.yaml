@@ -1,0 +1,44 @@
+{{- range .Values.applications }}
+{{- if .enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: argocd
+spec:
+  project: {{ $.Values.project.name }}
+
+  source:
+    repoURL: {{ $.Values.repository.url | quote }}
+    targetRevision: {{ $.Values.repository.revision | quote }}
+    path: {{ .path | quote }}
+
+    helm:
+      releaseName: {{ .releaseName | quote }}
+
+  destination:
+    server: {{ $.Values.destination.server | quote }}
+    namespace: {{ $.Values.destination.namespace | quote }}
+
+  syncPolicy:
+    {{- if .sync.automated }}
+    automated:
+      enabled: true
+      prune: {{ .sync.prune }}
+      selfHeal: {{ .sync.selfHeal }}
+      allowEmpty: false
+    {{- end }}
+
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}
+{{- end }}

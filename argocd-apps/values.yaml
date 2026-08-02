@@ -1,0 +1,76 @@
+repository:
+  url: https://github.com/jerry7129/KTB_projects.git
+  revision: main
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: default
+
+project:
+  name: ktb-board
+  description: ktb-board applications and infrastructure
+
+  clusterResourceWhitelist:
+    - group: storage.k8s.io
+      kind: StorageClass
+
+    - group: gateway.networking.k8s.io
+      kind: GatewayClass
+
+  namespaceResourceWhitelist:
+    # ktb-board-infra
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+
+    - group: gateway.k8s.aws
+      kind: LoadBalancerConfiguration
+
+    # Spring / Express
+    - group: ""
+      kind: Service
+
+    - group: ""
+      kind: ConfigMap
+
+    - group: ""
+      kind: ServiceAccount
+
+    - group: apps
+      kind: Deployment
+
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+
+applications:
+  - name: ktb-board-infra
+    enabled: true
+    path: ktb-board-infra
+    releaseName: ktb-board-infra
+
+    sync:
+      automated: false
+      prune: false
+      selfHeal: true
+
+  - name: ktb-board-spring
+    enabled: false
+    path: ktb-board-spring
+    releaseName: ktb-board-spring
+
+    sync:
+      automated: false
+      prune: false
+      selfHeal: true
+
+  - name: ktb-board-express
+    enabled: false
+    path: ktb-board-express
+    releaseName: ktb-board-express
+
+    sync:
+      automated: false
+      prune: false
+      selfHeal: true

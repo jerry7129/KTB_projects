@@ -1,0 +1,8 @@
+apiVersion: v2
+
+name: ktb-board-argocd-apps
+description: Argo CD Applications for ktb-board
+type: application
+
+version: 0.1.0
+appVersion: "1.0.0"

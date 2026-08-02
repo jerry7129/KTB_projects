@@ -1,0 +1,13 @@
+apiVersion: v2
+
+name: ktb-board-argocd
+description: Argo CD installation for the ktb-board Kubernetes cluster
+type: application
+
+version: 0.1.0
+appVersion: "3.4.6"
+
+dependencies:
+  - name: argo-cd
+    version: "10.2.2"
+    repository: "https://argoproj.github.io/argo-helm"
