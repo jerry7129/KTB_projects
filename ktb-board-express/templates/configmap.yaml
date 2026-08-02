@@ -1,0 +1,13 @@
+{{- if .Values.config.create }}
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: {{ include "ktb-board-express.configMapName" . | quote }}
+
+  labels:
+    {{- include "ktb-board-express.labels" . | nindent 4 }}
+
+data:
+  {{- toYaml .Values.config.data | nindent 2 }}
+{{- end }}

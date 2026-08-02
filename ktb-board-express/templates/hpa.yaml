@@ -1,0 +1,50 @@
+{{- if .Values.autoscaling.enabled }}
+
+{{- if and
+      (not .Values.autoscaling.metrics.cpu.enabled)
+      (not .Values.autoscaling.metrics.memory.enabled)
+}}
+{{- fail "HPA를 활성화하려면 CPU 또는 Memory metric 중 하나 이상을 활성화해야 합니다." }}
+{{- end }}
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+
+metadata:
+  name: {{ include "ktb-board-express.hpaName" . | quote }}
+
+  labels:
+    {{- include "ktb-board-express.labels" . | nindent 4 }}
+
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "ktb-board-express.deploymentName" . | quote }}
+
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+
+  metrics:
+    {{- if .Values.autoscaling.metrics.cpu.enabled }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.metrics.cpu.averageUtilization }}
+    {{- end }}
+
+    {{- if .Values.autoscaling.metrics.memory.enabled }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.metrics.memory.averageUtilization }}
+    {{- end }}
+
+  behavior:
+    {{- toYaml .Values.autoscaling.behavior | nindent 4 }}
+
+{{- end }}

@@ -1,0 +1,197 @@
+replicaCount: 2
+
+environment: prod
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: 180294193538.dkr.ecr.ap-northeast-2.amazonaws.com/ktb-board-express
+  tag: v1.0.1
+  pullPolicy: IfNotPresent
+
+# Worker의 ECR Credential Provider를 사용하므로 비워 둠
+imagePullSecrets: []
+
+container:
+  name: express-container
+  port: 3000
+  portName: http
+
+deployment:
+  revisionHistoryLimit: 3
+
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+  terminationGracePeriodSeconds: 30
+
+config:
+  create: true
+
+  data:
+    NODE_ENV: production
+    PORT: "3000"
+
+    # 브라우저가 같은 도메인의 Spring HTTPRoute를 호출
+    API_BASE_URL: "/api"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: http
+
+  # 비워 두면 Kubernetes가 자동 할당
+  nodePort: null
+
+  externalTrafficPolicy: Cluster
+  annotations: {}
+
+httpRoute:
+  enabled: true
+  name: ""
+
+  gateway:
+    name: ktb-board-gateway
+    namespace: gateway-system
+    listener: https
+
+  hostnames:
+    - board.steven-project.store
+
+  path:
+    type: PathPrefix
+    value: /
+
+targetGroup:
+  enabled: true
+  name: ""
+
+  targetType: instance
+  protocol: HTTP
+  protocolVersion: HTTP1
+
+  healthCheck:
+    protocol: HTTP
+    path: /health
+
+    # 비워 두면 NodePort인 traffic port 사용
+    port: ""
+
+    intervalSeconds: 15
+    timeoutSeconds: 5
+    healthyThresholdCount: 2
+    unhealthyThresholdCount: 2
+
+    matcher:
+      httpCode: "200"
+
+  tags:
+    Project: ktb-board
+    Component: express
+
+probes:
+  startup:
+    enabled: true
+    path: /health
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 12
+    successThreshold: 1
+
+  readiness:
+    enabled: true
+    path: /health
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 2
+    successThreshold: 1
+
+  liveness:
+    enabled: true
+    path: /health
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+    successThreshold: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+autoscaling:
+  enabled: true
+  name: ""
+
+  minReplicas: 1
+  maxReplicas: 2
+
+  metrics:
+    cpu:
+      enabled: true
+      averageUtilization: 70
+
+    memory:
+      enabled: false
+      averageUtilization: 75
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 30
+
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+serviceMonitor:
+  enabled: true
+  componentLabel: express
+  port: http
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: 10s
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

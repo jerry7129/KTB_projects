@@ -1,0 +1,42 @@
+{{- if .Values.targetGroup.enabled }}
+apiVersion: gateway.k8s.aws/v1beta1
+kind: TargetGroupConfiguration
+
+metadata:
+  name: {{ include "ktb-board-express.targetGroupConfigurationName" . | quote }}
+
+  labels:
+    {{- include "ktb-board-express.labels" . | nindent 4 }}
+
+spec:
+  targetReference:
+    group: ""
+    kind: Service
+    name: {{ include "ktb-board-express.serviceName" . | quote }}
+
+  defaultConfiguration:
+    targetType: {{ .Values.targetGroup.targetType | quote }}
+    protocol: {{ .Values.targetGroup.protocol | quote }}
+    protocolVersion: {{ .Values.targetGroup.protocolVersion | quote }}
+
+    healthCheckConfig:
+      healthCheckProtocol: {{ .Values.targetGroup.healthCheck.protocol | quote }}
+      healthCheckPath: {{ .Values.targetGroup.healthCheck.path | quote }}
+
+      {{- with .Values.targetGroup.healthCheck.port }}
+      healthCheckPort: {{ . | quote }}
+      {{- end }}
+
+      healthCheckInterval: {{ .Values.targetGroup.healthCheck.intervalSeconds }}
+      healthCheckTimeout: {{ .Values.targetGroup.healthCheck.timeoutSeconds }}
+      healthyThresholdCount: {{ .Values.targetGroup.healthCheck.healthyThresholdCount }}
+      unhealthyThresholdCount: {{ .Values.targetGroup.healthCheck.unhealthyThresholdCount }}
+
+      matcher:
+        httpCode: {{ .Values.targetGroup.healthCheck.matcher.httpCode | quote }}
+
+    {{- with .Values.targetGroup.tags }}
+    tags:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+{{- end }}
