@@ -6,7 +6,7 @@ gatewayClass:
 loadBalancer:
   enabled: true
   name: ktb-board-alb-config
-  loadBalancerName: ktb-board-alb
+  loadBalancerName: ""
   scheme: internet-facing
   ipAddressType: ipv4
 
