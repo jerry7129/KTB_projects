@@ -1,0 +1,18 @@
+{{- if .Values.monitoringStorageClass.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.monitoringStorageClass.name }}
+  labels:
+    app.kubernetes.io/part-of: ktb-board
+    app.kubernetes.io/component: monitoring-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+provisioner: ebs.csi.aws.com
+reclaimPolicy: {{ .Values.monitoringStorageClass.reclaimPolicy }}
+volumeBindingMode: {{ .Values.monitoringStorageClass.volumeBindingMode }}
+allowVolumeExpansion: {{ .Values.monitoringStorageClass.allowVolumeExpansion }}
+parameters:
+  {{- toYaml .Values.monitoringStorageClass.parameters | nindent 2 }}
+{{- end }}
+

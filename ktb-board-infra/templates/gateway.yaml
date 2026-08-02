@@ -1,0 +1,145 @@
+{{- if .Values.gateway.enabled }}
+
+{{- if and
+      (not .Values.gateway.listeners.http.enabled)
+      (not .Values.gateway.listeners.https.enabled)
+}}
+{{- fail "gateway.listeners.http 또는 gateway.listeners.https 중 하나 이상을 활성화해야 합니다." }}
+{{- end }}
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+
+metadata:
+  name: {{ .Values.gateway.name | quote }}
+  labels:
+    {{- include "ktb-board-infra.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+
+spec:
+  gatewayClassName: {{ .Values.gateway.className | quote }}
+
+  infrastructure:
+    parametersRef:
+      group: gateway.k8s.aws
+      kind: LoadBalancerConfiguration
+      name: {{ .Values.loadBalancer.name | quote }}
+
+  listeners:
+    {{- if .Values.gateway.listeners.http.enabled }}
+    - name: {{ .Values.gateway.listeners.http.name | quote }}
+      protocol: {{ .Values.gateway.listeners.http.protocol | quote }}
+      port: {{ .Values.gateway.listeners.http.port }}
+
+      {{- with .Values.gateway.listeners.http.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.https.enabled }}
+    - name: {{ .Values.gateway.listeners.https.name | quote }}
+      protocol: {{ .Values.gateway.listeners.https.protocol | quote }}
+      port: {{ .Values.gateway.listeners.https.port }}
+
+      {{- with .Values.gateway.listeners.https.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.grafanaHttps.enabled }}
+    - name: {{ .Values.gateway.listeners.grafanaHttps.name | quote }}
+      protocol: {{ .Values.gateway.listeners.grafanaHttps.protocol | quote }}
+      port: {{ .Values.gateway.listeners.grafanaHttps.port }}
+
+      {{- with .Values.gateway.listeners.grafanaHttps.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.portainerHttp.enabled }}
+    - name: {{ .Values.gateway.listeners.portainerHttp.name | quote }}
+      protocol: {{ .Values.gateway.listeners.portainerHttp.protocol | quote }}
+      port: {{ .Values.gateway.listeners.portainerHttp.port }}
+
+      {{- with .Values.gateway.listeners.portainerHttp.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+    {{- if .Values.gateway.listeners.portainerHttps.enabled }}
+    - name: {{ .Values.gateway.listeners.portainerHttps.name | quote }}
+      protocol: {{ .Values.gateway.listeners.portainerHttps.protocol | quote }}
+      port: {{ .Values.gateway.listeners.portainerHttps.port }}
+
+      {{- with .Values.gateway.listeners.portainerHttps.hostname }}
+      hostname: {{ . | quote }}
+      {{- end }}
+
+      allowedRoutes:
+        namespaces:
+          from: {{ $.Values.gateway.allowedRoutes.namespaces.from | quote }}
+
+          {{- if eq $.Values.gateway.allowedRoutes.namespaces.from "Selector" }}
+          selector:
+            {{- toYaml $.Values.gateway.allowedRoutes.namespaces.selector | nindent 12 }}
+          {{- end }}
+
+        kinds:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+    {{- end }}
+
+{{- end }}

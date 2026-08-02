@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ktb-board-infra
+description: Gateway and load balancer infrastructure for KTB Board
+type: application
+version: 0.1.0

@@ -1,0 +1,88 @@
+gatewayClass:
+  enabled: true
+  name: aws-alb
+  controllerName: gateway.k8s.aws/alb
+
+loadBalancer:
+  enabled: true
+  name: ktb-board-alb-config
+  loadBalancerName: ktb-board-alb
+  scheme: internet-facing
+  ipAddressType: ipv4
+
+  # Controller 설치 시 vpcId를 지정했다면 생략 가능
+  vpcId: ""
+
+  subnets:
+    - subnet-09b8e1367c9dee3e6
+    - subnet-029d3fd6f1d126321
+
+  secrutiyGroups:
+    - sg-0416ebc9aeaefb74d
+
+  manageBackendSecurityGroupRules: true
+  certificateArn: arn:aws:acm:ap-northeast-2:180294193538:certificate/1a759f80-a5ff-496d-9b87-5730e50475ed
+  sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+  tags:
+    Project: ktb-board
+    ManagedBy: helm
+
+gateway:
+  enabled: true
+  name: ktb-board-gateway
+  className: aws-alb
+
+  allowedRoutes:
+    namespaces:
+      from: Selector
+      selector:
+        matchLabels:
+          gateway-access: allowed
+
+  listeners:
+    http:
+      enabled: true
+      name: http
+      protocol: HTTP
+      port: 80
+      hostname: board.steven-project.store
+
+    https:
+      enabled: true
+      name: https
+      protocol: HTTPS
+      port: 443
+      hostname: board.steven-project.store
+
+    grafanaHttps:
+      enabled: true
+      name: grafana-https
+      protocol: HTTPS
+      port: 443
+      hostname: grafana.steven-project.store
+
+    portainerHttp:
+      enabled: true
+      name: portainer-http
+      protocol: HTTP
+      port: 80
+      hostname: portainer.steven-project.store
+
+    portainerHttps:
+      enabled: true
+      name: portainer-https
+      protocol: HTTPS
+      port: 443
+      hostname: portainer.steven-project.store
+
+monitoringStorageClass:
+  enabled: true
+  name: ebs-gp3-monitoring
+  reclaimPolicy: Retain
+  volumeBindingMode: WaitForFirstConsumer
+  allowVolumeExpansion: true
+  parameters:
+    type: gp3
+    encrypted: "true"
+    fsType: ext4

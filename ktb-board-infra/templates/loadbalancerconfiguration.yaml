@@ -1,0 +1,64 @@
+{{- if .Values.loadBalancer.enabled }}
+apiVersion: gateway.k8s.aws/v1beta1
+kind: LoadBalancerConfiguration
+metadata:
+  name: {{ .Values.loadBalancer.name | quote }}
+  labels:
+    {{- include "ktb-board-infra.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+
+spec:
+  {{- with .Values.loadBalancer.loadBalancerName }}
+  loadBalancerName: {{ . | quote }}
+  {{- end }}
+
+  scheme: {{ .Values.loadBalancer.scheme | quote }}
+  ipAddressType: {{ .Values.loadBalancer.ipAddressType | quote }}
+
+  {{- with .Values.loadBalancer.vpcId }}
+  vpcId: {{ . | quote }}
+  {{- end }}
+
+  {{- with .Values.loadBalancer.subnets }}
+  loadBalancerSubnets:
+    {{- range . }}
+    - identifier: {{ . | quote }}
+    {{- end }}
+  {{- end }}
+
+  {{- with .Values.loadBalancer.securityGroups }}
+  securityGroups:
+    {{- toYaml . | nindent 4 }}
+
+  manageBackendSecurityGroupRules: {{ $.Values.loadBalancer.manageBackendSecurityGroupRules }}
+  {{- end }}
+
+  {{- if and
+      (not .Values.loadBalancer.securityGroups)
+      .Values.loadBalancer.sourceRanges
+  }}
+  sourceRanges:
+    {{- toYaml .Values.loadBalancer.sourceRanges | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.gateway.listeners.https.enabled }}
+  listenerConfigurations:
+    - protocolPort: {{ printf "HTTPS:%v" .Values.gateway.listeners.https.port | quote }}
+      defaultCertificate: {{
+        required
+          "HTTPS Listener를 사용하려면 loadBalancer.certificateArn이 필요합니다."
+          .Values.loadBalancer.certificateArn
+        | quote
+      }}
+
+      {{- with .Values.loadBalancer.sslPolicy }}
+      sslPolicy: {{ . | quote }}
+      {{- end }}
+  {{- end }}
+
+  {{- with .Values.loadBalancer.tags }}
+  tags:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
