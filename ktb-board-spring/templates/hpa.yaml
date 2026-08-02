@@ -19,7 +19,6 @@ metadata:
   name: {{ $hpaName | quote }}
   labels:
     {{- include "ktb-board-spring.labels" . | nindent 4 }}
-    environment: {{ .Values.environment | quote }}
 
 spec:
   scaleTargetRef:

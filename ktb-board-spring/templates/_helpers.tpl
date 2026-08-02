@@ -31,15 +31,31 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
-Common labels
+Pod에 부여하는 라벨
+selectorLabels + 선택적인 environment
+*/}}
+{{- define "ktb-board-spring.podLabels" -}}
+{{ include "ktb-board-spring.selectorLabels" . }}
+{{- with .Values.environment }}
+environment: {{ . | quote }}
+{{- end }}
+{{- end }}
+
+
+{{/*
+모든 Kubernetes 리소스의 metadata.labels에서 사용하는 공통 라벨
 */}}
 {{- define "ktb-board-spring.labels" -}}
 helm.sh/chart: {{ include "ktb-board-spring.chart" . }}
 {{ include "ktb-board-spring.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- with .Chart.AppVersion }}
+app.kubernetes.io/version: {{ . | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: ktb-board
+{{- with .Values.environment }}
+environment: {{ . | quote }}
+{{- end }}
 {{- end }}
 
 {{/*

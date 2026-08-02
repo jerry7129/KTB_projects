@@ -19,7 +19,6 @@ metadata:
   name: {{ $backendRouteName | quote }}
   labels:
     {{- include "ktb-board-spring.labels" . | nindent 4 }}
-    environment: {{ .Values.environment | quote }}
 
 spec:
   parentRefs:
@@ -56,7 +55,6 @@ metadata:
   name: {{ $redirectRouteName | quote }}
   labels:
     {{- include "ktb-board-spring.labels" . | nindent 4 }}
-    environment: {{ .Values.environment | quote }}
 
 spec:
   parentRefs:

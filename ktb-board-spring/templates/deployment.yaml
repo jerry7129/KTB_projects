@@ -5,7 +5,6 @@ metadata:
   name: {{ include "ktb-board-spring.deploymentName" . | quote }}
   labels:
     {{- include "ktb-board-spring.labels" . | nindent 4 }}
-    environment: {{ .Values.environment | quote }}
 
 spec:
   {{- if not .Values.autoscaling.enabled }}
@@ -26,7 +25,6 @@ spec:
     metadata:
       labels:
         {{- include "ktb-board-spring.selectorLabels" . | nindent 8 }}
-        environment: {{ .Values.environment | quote }}
 
     spec:
       serviceAccountName: {{ include "ktb-board-spring.serviceAccountName" . | quote }}
