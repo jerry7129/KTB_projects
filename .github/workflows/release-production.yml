@@ -413,12 +413,33 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          # Tag 이벤트에서는 detached HEAD이므로 최신 main을 기준으로
-          # GitOps 배포 commit을 생성한다.
-          git fetch origin main --depth=1
-          git switch --force-create gitops-release origin/main
+          echo "Release version: ${VERSION}"
+          echo "Current ref: ${GITHUB_REF}"
+          echo "Current commit: $(git rev-parse HEAD)"
+
+          # Git이 사용자 입력을 기다리며 무한정 멈추는 것을 방지한다.
+          export GIT_TERMINAL_PROMPT=0
+
+          echo "Fetching latest main..."
+
+          timeout 60s git fetch \
+            --no-tags \
+            origin \
+            main \
+            --depth=1
+
+          echo "Fetched latest main successfully."
+
+          git switch \
+            --force-create gitops-release \
+            origin/main
+
+          echo "Switched to $(git rev-parse --abbrev-ref HEAD)"
+          echo "GitOps base commit: $(git rev-parse HEAD)"
 
           export VERSION
+
+          echo "Updating Helm values..."
 
           python3 <<'PY'
           import os
@@ -432,8 +453,6 @@ jobs:
               Path("ktb-board-express/values.yaml"),
           ]
 
-          # top-level image 블록 내부의 tag 값만 변경한다.
-          # PyYAML로 전체 파일을 다시 쓰지 않으므로 기존 주석과 서식을 보존한다.
           pattern = re.compile(
               r"(?ms)"
               r"^(image:\s*\n)"
@@ -443,6 +462,8 @@ jobs:
           )
 
           for path in value_files:
+              print(f"Processing {path}...", flush=True)
+
               if not path.is_file():
                   raise SystemExit(f"values 파일이 없습니다: {path}")
 
@@ -454,6 +475,12 @@ jobs:
                       f"{path}에서 top-level image.tag를 찾지 못했습니다."
                   )
 
+              current_tag = match.group("value").strip()
+              print(
+                  f"Updating {path}: {current_tag} -> {version}",
+                  flush=True,
+              )
+
               updated = (
                   content[:match.start("value")]
                   + version
@@ -461,12 +488,17 @@ jobs:
               )
 
               path.write_text(updated, encoding="utf-8")
-              print(f"Updated {path}: image.tag={version}")
+
+          print("All image tags updated.", flush=True)
           PY
 
           echo "Updated image values:"
+
           grep -A4 '^image:' ktb-board-spring/values.yaml
           grep -A4 '^image:' ktb-board-express/values.yaml
+
+          echo "Changed files:"
+          git status --short
 
       - name: Validate GitOps Helm charts
         shell: bash
