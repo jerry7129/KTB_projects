@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -96,7 +95,7 @@ public class PostService {
         // 변경 시, 기존에 가지고 있던 물리 파일을 삭제. (고아 파일 방지)
         boolean isImageChanged = false;
         if (post.getPostImages() != null && !post.getPostImages().isEmpty()) {
-            PostImage oldImage = post.getPostImages().get(0);
+            PostImage oldImage = post.getPostImages().getFirst();
             if (newImage == null || !oldImage.getFileKey().equals(newImage.getFileKey())) {
                 fileService.delete(oldImage.getFileKey());
                 isImageChanged = true;
@@ -111,7 +110,7 @@ public class PostService {
             post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), newImage);
         } else {
             post.changePostInformation(requestDto.getPostTitle(), requestDto.getPostContent(), 
-                    (post.getPostImages() != null && !post.getPostImages().isEmpty()) ? post.getPostImages().get(0) : null);
+                    (post.getPostImages() != null && !post.getPostImages().isEmpty()) ? post.getPostImages().getFirst() : null);
         }
         return PostResponseDto.from(post, false);
     }
@@ -143,8 +142,8 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostListCursorResponseDto getPosts(Long cursor, int limit) {
-        List<Post> posts = postRepository.findPostsWithCursor(cursor, PageRequest.of(0, limit));
+    public PostListCursorResponseDto getPosts(String keyword, String sort, String order, Long cursor, int limit) {
+        List<Post> posts = postRepository.findPostsWithCursor(keyword, sort, order, cursor, PageRequest.of(0, limit));
 
         boolean hasNext = false;
         if (posts.size() > limit) {
@@ -152,7 +151,7 @@ public class PostService {
             posts.remove(limit);
         }
 
-        Long nextCursor = hasNext ? posts.get(posts.size() - 1).getId() : null;
+        Long nextCursor = hasNext ? posts.getLast().getId() : null;
 
         List<PostResponseDto> postList = posts.stream()
                 .map(post -> PostResponseDto.from(post, false))
@@ -172,7 +171,7 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new NotFoundException("POST_NOT_FOUND"));
 
-        Boolean isLiked = false;
+        boolean isLiked = false;
         if (userId != null) {
             isLiked = postLikeRepository.existsById(new PostLikeEntityId(userId, postId));
         }
