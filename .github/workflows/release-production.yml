@@ -39,7 +39,7 @@ jobs:
     environment: production
 
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     steps:
@@ -403,76 +403,122 @@ jobs:
 
           echo "Release manifest stored: ${RELEASE_URI}"
 
-      - name: Deploy production via SSM
+            # ECR 이미지 승격이 완료된 뒤 Git의 Helm image tag를 변경한다.
+            
+      # Argo CD는 이 Git 변경을 감지하여 Kubernetes에 자동 배포한다.
+      - name: Update GitOps image tags
         env:
           VERSION: ${{ steps.vars.outputs.version }}
-          RELEASE_URI: ${{ steps.vars.outputs.release_uri }}
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          DEPLOY_COMMAND="sudo /opt/ktb-board/bin/deploy.sh release ${RELEASE_URI}"
+          # Tag 이벤트에서는 detached HEAD이므로 최신 main을 기준으로
+          # GitOps 배포 commit을 생성한다.
+          git fetch origin main --depth=1
+          git switch --force-create gitops-release origin/main
 
-          PARAMETERS="$(
-            jq -cn \
-              --arg command "${DEPLOY_COMMAND}" \
-              '{commands: [$command]}'
-          )"
+          export VERSION
 
-          COMMAND_ID="$(
-            aws ssm send-command \
-              --region "${AWS_REGION}" \
-              --document-name "AWS-RunShellScript" \
-              --targets \
-                "Key=tag:Project,Values=ktb-board" \
-                "Key=tag:Role,Values=app" \
-                "Key=tag:Env,Values=prod" \
-              --parameters "${PARAMETERS}" \
-              --comment "Deploy ktb-board ${VERSION}" \
-              --timeout-seconds 900 \
-              --max-concurrency "1" \
-              --max-errors "0" \
-              --query "Command.CommandId" \
-              --output text
-          )"
+          python3 <<'PY'
+          import os
+          import re
+          from pathlib import Path
 
-          echo "SSM Command ID: ${COMMAND_ID}"
+          version = os.environ["VERSION"]
 
-          for attempt in {1..90}; do
-            STATUSES="$(
-              aws ssm list-command-invocations \
-                --region "${AWS_REGION}" \
-                --command-id "${COMMAND_ID}" \
-                --query "CommandInvocations[].Status" \
-                --output text
-            )"
+          value_files = [
+              Path("ktb-board-spring/values.yaml"),
+              Path("ktb-board-express/values.yaml"),
+          ]
 
-            echo "Deployment status: ${STATUSES:-not-started}"
+          # top-level image 블록 내부의 tag 값만 변경한다.
+          # PyYAML로 전체 파일을 다시 쓰지 않으므로 기존 주석과 서식을 보존한다.
+          pattern = re.compile(
+              r"(?ms)"
+              r"^(image:\s*\n)"
+              r"(?P<body>(?:^[ \t]+.*\n|^[ \t]*#.*\n)*?)"
+              r"(?P<prefix>^[ \t]+tag:\s*)"
+              r"(?P<value>[^\n#]*)"
+          )
 
-            if echo "${STATUSES}" |
-              grep -Eq "Failed|Cancelled|TimedOut|Cancelling"; then
+          for path in value_files:
+              if not path.is_file():
+                  raise SystemExit(f"values 파일이 없습니다: {path}")
 
-              echo "::error::Production 배포에 실패했습니다."
+              content = path.read_text(encoding="utf-8")
 
-              aws ssm list-command-invocations \
-                --region "${AWS_REGION}" \
-                --command-id "${COMMAND_ID}" \
-                --details \
-                --output table || true
+              match = pattern.search(content)
+              if match is None:
+                  raise SystemExit(
+                      f"{path}에서 top-level image.tag를 찾지 못했습니다."
+                  )
 
-              exit 1
-            fi
+              updated = (
+                  content[:match.start("value")]
+                  + version
+                  + content[match.end("value"):]
+              )
 
-            if [[ -n "${STATUSES}" ]] &&
-              ! echo "${STATUSES}" |
-                grep -Eq "Pending|InProgress|Delayed"; then
+              path.write_text(updated, encoding="utf-8")
+              print(f"Updated {path}: image.tag={version}")
+          PY
 
-              echo "Production deployment completed."
-              exit 0
-            fi
+          echo "Updated image values:"
+          grep -A4 '^image:' ktb-board-spring/values.yaml
+          grep -A4 '^image:' ktb-board-express/values.yaml
 
-            sleep 10
-          done
+      - name: Validate GitOps Helm charts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
 
-          echo "::error::Production 배포 확인 시간이 초과되었습니다."
-          exit 1
+          helm lint ./ktb-board-spring
+          helm lint ./ktb-board-express
+
+          helm template ktb-board-spring \
+            ./ktb-board-spring \
+            --namespace default \
+            >/tmp/ktb-board-spring.yaml
+
+          helm template ktb-board-express \
+            ./ktb-board-express \
+            --namespace default \
+            >/tmp/ktb-board-express.yaml
+
+      - name: Commit GitOps deployment
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          COMMIT_SHA: ${{ steps.vars.outputs.commit_sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          VALUES_FILES=(
+            "ktb-board-spring/values.yaml"
+            "ktb-board-express/values.yaml"
+          )
+
+          if git diff --quiet -- "${VALUES_FILES[@]}"; then
+            echo "GitOps values에는 이미 ${VERSION}이 반영되어 있습니다."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "${VALUES_FILES[@]}"
+
+          git commit \
+            -m "chore(deploy): promote production to ${VERSION} [skip ci]" \
+            -m "Release commit: ${COMMIT_SHA}"
+
+          # Checkout 단계에서 persist-credentials=false를 사용하므로
+          # push 명령에 GITHUB_TOKEN을 명시한다.
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:main
+
+          echo "GitOps deployment commit pushed for ${VERSION}."
