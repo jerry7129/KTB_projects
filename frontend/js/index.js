@@ -2,7 +2,7 @@ import BoardItem from '../component/board/boardItem.js';
 import Dialog from '../component/dialog/dialog.js';
 import Header from '../component/header/header.js';
 import { authCheck, getServerUrl, prependChild, resolveImageUrl } from '../utils/function.js';
-import { getPosts, searchPosts } from '../requests/indexRequest.js';
+import { getPosts } from '../requests/indexRequest.js';
 
 const DEFAULT_PROFILE_IMAGE = '../public/image/profile/default.jpg';
 const HTTP_NOT_AUTHORIZED = 401;
@@ -10,8 +10,10 @@ const SCROLL_THRESHOLD = 0.9;
 const INITIAL_OFFSET = 5;
 const ITEMS_PER_LOAD = 5;
 const DEFAULT_SORT = 'recent';
+const DEFAULT_ORDER = 'desc';
 let currentKeyword = '';
 let currentSort = DEFAULT_SORT;
+let currentOrder = DEFAULT_ORDER;
 let nextCursor = null;
 let isEnd = false;
 let isProcessing = false;
@@ -26,15 +28,7 @@ const updateSortVisibility = () => {
 
 // getBoardItem 함수
 const getBoardItem = async (cursorValue = null, limitValue = 5) => {
-    const result =
-        currentKeyword.trim() === ''
-            ? await getPosts(cursorValue, limitValue)
-            : await searchPosts(
-                  currentKeyword,
-                  cursorValue,
-                  limitValue,
-                  currentSort,
-              );
+    const result = await getPosts(currentKeyword, cursorValue, limitValue, currentSort, currentOrder);
     if (!result.ok) {
         throw new Error('Failed to load post list.');
     }
@@ -129,10 +123,13 @@ const addSearchEvent = () => {
 const addSortEvent = () => {
     const sortSelect = document.querySelector('#searchSortSelect');
     if (!sortSelect) return;
-    sortSelect.value = currentSort;
+    sortSelect.value = `${currentSort}_${currentOrder}`;
 
     sortSelect.addEventListener('change', async () => {
-        currentSort = sortSelect.value || DEFAULT_SORT;
+        const value = sortSelect.value || `${DEFAULT_SORT}_${DEFAULT_ORDER}`;
+        const [sort, order] = value.split('_');
+        currentSort = sort;
+        currentOrder = order;
         if (currentKeyword.trim().length === 0) return;
         await loadBoardItems({ reset: true });
     });

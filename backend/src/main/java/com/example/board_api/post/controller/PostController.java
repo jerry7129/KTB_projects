@@ -60,10 +60,13 @@ public class PostController {
     // 게시글 목록 조회 (커서 기반 paging)
     @GetMapping
     public ResponseEntity<ApiResponse<PostListCursorResponseDto>> getPosts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String order,
             @RequestParam(required = false) Long startingAfter,
             @RequestParam(defaultValue = "10") Integer limit
     ) {
-        PostListCursorResponseDto responseDto = postService.getPosts(startingAfter, limit);
+        PostListCursorResponseDto responseDto = postService.getPosts(keyword, sort, order, startingAfter, limit);
         return ResponseEntity.status(HttpStatus.OK).body(
                 ApiResponse.of("GET_SUCCESS", "게시글 목록 조회를 성공했습니다.", responseDto));
     }
@@ -100,6 +103,7 @@ public class PostController {
                 .body(ApiResponse.of("UNLIKE_SUCCESS", "게시글 좋아요 취소를 성공했습니다.", responseDto));
     }
 
+    // 특정 게시글 댓글 생성
     @PostMapping("/{postId}/comments")
     public ResponseEntity<ApiResponse<CommentResponseDto>> addComment(
             @AuthenticationPrincipal Integer userId,

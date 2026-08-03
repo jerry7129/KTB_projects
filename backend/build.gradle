@@ -17,36 +17,56 @@ repositories {
 	mavenCentral()
 }
 
+def querydslVersion = '7.5'
+
+configurations.configureEach {
+	// 기존 QueryDSL이 전이 의존성으로 들어오는 것을 방지
+	exclude group: 'com.querydsl'
+}
+
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-	implementation 'io.github.openfeign.querydsl:querydsl-jpa:6.10.1'
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	compileOnly 'org.projectlombok:lombok'
-	runtimeOnly 'com.mysql:mysql-connector-j'
-	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
-	annotationProcessor 'org.projectlombok:lombok'
-	annotationProcessor "com.querydsl:querydsl-apt:${dependencyManagement.importedProperties['querydsl.version']}:jakarta"
-	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
-	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	testRuntimeOnly 'com.h2database:h2'
-	testAnnotationProcessor 'org.projectlombok:lombok'
+		implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+		implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+		implementation 'org.springframework.boot:spring-boot-starter-validation'
+		implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+		implementation 'org.springframework.boot:spring-boot-starter-security'
+		implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+		// QueryDSL 런타임 및 컴파일 의존성
+		implementation "io.github.openfeign.querydsl:querydsl-jpa:${querydslVersion}"
+		implementation "io.github.openfeign.querydsl:querydsl-jpa:${querydslVersion}"
+
+		// QueryDSL Q 클래스 생성기
+		annotationProcessor "io.github.openfeign.querydsl:querydsl-core:${querydslVersion}"
+		annotationProcessor "io.github.openfeign.querydsl:querydsl-codegen:${querydslVersion}"
+		annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:${querydslVersion}:jakarta"
+		annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+		annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+		implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+
+		compileOnly 'org.projectlombok:lombok'
+		annotationProcessor 'org.projectlombok:lombok'
+
+		runtimeOnly 'com.mysql:mysql-connector-j'
+		runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+		runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+		runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+		testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+		testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+		testCompileOnly 'org.projectlombok:lombok'
+		testAnnotationProcessor 'org.projectlombok:lombok'
+
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+		testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 }
 
-clean {
+tasks.named('clean') {
 	delete file('src/main/generated')
 }
