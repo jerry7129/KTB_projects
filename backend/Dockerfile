@@ -7,6 +7,11 @@ LABEL authors="ktb_ksg"
 
 WORKDIR /app
 
+# Gradle Wrapper에서 사용하는 xargs 설치
+RUN dnf install -y findutils \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
 # Gradle Wrapper와 빌드 설정을 먼저 복사
 # Overlafs 캐시 이점 살리기 위함
 COPY gradlew ./

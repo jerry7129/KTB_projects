@@ -1,31 +1,22 @@
 import { getServerUrl } from '../utils/function.js';
 import { requestJson } from '../utils/request.js';
 
-export const getPosts = (startingAfter, limit) => {
+export const getPosts = (keyword = '', startingAfter = null, limit = 5, sort = 'recent', order = 'desc') => {
     const params = new URLSearchParams({ limit });
+    if (keyword.trim()) {
+        params.append('keyword', keyword.trim());
+    }
+    if (sort) {
+        params.append('sort', sort);
+    }
+    if (order) {
+        params.append('order', order);
+    }
     if (startingAfter) {
         params.append('startingAfter', startingAfter);
     }
     const result = requestJson(
         `${getServerUrl()}/posts?${params.toString()}`,
-        {
-            credentials: 'include',
-        },
-    );
-    return result;
-};
-
-export const searchPosts = (keyword, startingAfter = null, limit = 5, sort = 'recent') => {
-    const params = new URLSearchParams({
-        keyword,
-        limit,
-        sort,
-    });
-    if (startingAfter) {
-        params.append('startingAfter', startingAfter);
-    }
-    const result = requestJson(
-        `${getServerUrl()}/posts/search?${params.toString()}`,
         {
             credentials: 'include',
         },
