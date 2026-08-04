@@ -7,4 +7,5 @@ public interface PostStatusRepositoryCustom {
     void incrementCommentCount(Long postId);
     void decrementCommentCount(Long postId);
     Integer getLikeCount(Long postId);
+    Long getCommentCount(Long postId);
 }

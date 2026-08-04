@@ -68,4 +68,13 @@ public class PostStatusRepositoryImpl implements PostStatusRepositoryCustom {
                 .where(postStatus.id.eq(postId))
                 .fetchOne();
     }
+
+    // 댓글수 조회
+    @Override
+    public Long getCommentCount(Long postId) {
+        return queryFactory.select(postStatus.commentCount)
+                .from(postStatus)
+                .where(postStatus.id.eq(postId))
+                .fetchOne();
+    }
 }

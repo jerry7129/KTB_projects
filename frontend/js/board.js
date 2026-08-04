@@ -177,18 +177,30 @@ const getBoardComment = async id => {
     const { ok, status, data } = await getComments(id);
     if (!ok) return [];
     if (status !== HTTP_OK) return [];
-    return data;
+    return data.comments || [];
 };
 
 const setBoardComment = (data, myInfo) => {
     const commentListElement = document.querySelector('.commentList');
-    if (commentListElement) {
-        data.map(event => {
+    if (commentListElement && Array.isArray(data)) {
+        const pageId = getQueryString('id');
+        data.forEach(event => {
+            const formattedEvent = {
+                id: event.commentId,
+                content: event.commentContent,
+                createdAt: event.createdAt,
+                author: {
+                    userId: event.commentWriter.commentWriterId,
+                    nickname: event.commentWriter.commentWriterNickname,
+                    profileImageUrl: event.commentWriter.commentWriterProfileImageUrl,
+                }
+            };
+
             const item = CommentItem(
-                event,
+                formattedEvent,
                 myInfo.userId,
-                event.postId,
-                event.id,
+                pageId,
+                formattedEvent.id,
             );
             commentListElement.appendChild(item);
         });
