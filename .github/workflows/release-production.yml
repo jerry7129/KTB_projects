@@ -413,14 +413,34 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          # Tag 이벤트에서는 detached HEAD이므로 최신 main을 기준으로
-          # GitOps 배포 commit을 생성한다.
-          git fetch origin main --depth=1
-          git switch --force-create gitops-release origin/main
+          echo "Release version: ${VERSION}"
+          echo "Current ref: ${GITHUB_REF}"
+          echo "Current commit: $(git rev-parse HEAD)"
+
+          export GIT_TERMINAL_PROMPT=0
+
+          echo "Fetching latest main..."
+
+          timeout 60s git fetch \
+            --no-tags \
+            origin \
+            main \
+            --depth=1
+
+          echo "Fetched latest main successfully."
+
+          git switch \
+            --force-create gitops-release \
+            origin/main
+
+          echo "Switched to $(git rev-parse --abbrev-ref HEAD)"
+          echo "GitOps base commit: $(git rev-parse HEAD)"
 
           export VERSION
 
-          python3 <<'PY'
+          echo "Updating Helm values..."
+
+          timeout 15s python3 <<'PY'
           import os
           import re
           from pathlib import Path
@@ -432,41 +452,91 @@ jobs:
               Path("ktb-board-express/values.yaml"),
           ]
 
-          # top-level image 블록 내부의 tag 값만 변경한다.
-          # PyYAML로 전체 파일을 다시 쓰지 않으므로 기존 주석과 서식을 보존한다.
-          pattern = re.compile(
-              r"(?ms)"
-              r"^(image:\s*\n)"
-              r"(?P<body>(?:^[ \t]+.*\n|^[ \t]*#.*\n)*?)"
-              r"(?P<prefix>^[ \t]+tag:\s*)"
-              r"(?P<value>[^\n#]*)"
-          )
-
-          for path in value_files:
+          def update_top_level_image_tag(path: Path, new_tag: str) -> None:
               if not path.is_file():
                   raise SystemExit(f"values 파일이 없습니다: {path}")
 
-              content = path.read_text(encoding="utf-8")
+              lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
 
-              match = pattern.search(content)
-              if match is None:
-                  raise SystemExit(
-                      f"{path}에서 top-level image.tag를 찾지 못했습니다."
+              in_image_block = False
+              image_block_found = False
+              tag_updated = False
+
+              for index, line in enumerate(lines):
+                  # 줄바꿈을 제외한 내용과 기존 줄바꿈을 분리한다.
+                  content = line.rstrip("\r\n")
+                  newline = line[len(content):]
+
+                  if not in_image_block:
+                      # 들여쓰기 없는 최상위 image: 블록만 선택한다.
+                      if re.fullmatch(r"image:[ \t]*(?:#.*)?", content):
+                          in_image_block = True
+                          image_block_found = True
+                      continue
+
+                  # 빈 줄과 주석은 image 블록 내부로 인정한다.
+                  if not content.strip() or content.lstrip().startswith("#"):
+                      continue
+
+                  # 들여쓰기 없는 다음 key를 만나면 image 블록 종료
+                  if content and not content[0].isspace():
+                      break
+
+                  # image 블록 안의 tag 값만 변경한다.
+                  match = re.fullmatch(
+                      r"(?P<prefix>[ \t]+tag:[ \t]*)"
+                      r"(?P<value>[^#]*?)"
+                      r"(?P<suffix>[ \t]*(?:#.*)?)",
+                      content,
                   )
 
-              updated = (
-                  content[:match.start("value")]
-                  + version
-                  + content[match.end("value"):]
-              )
+                  if match is None:
+                      continue
 
-              path.write_text(updated, encoding="utf-8")
-              print(f"Updated {path}: image.tag={version}")
+                  current_tag = match.group("value").strip()
+
+                  lines[index] = (
+                      f"{match.group('prefix')}"
+                      f"{new_tag}"
+                      f"{match.group('suffix')}"
+                      f"{newline}"
+                  )
+
+                  tag_updated = True
+
+                  print(
+                      f"Updated {path}: image.tag "
+                      f"{current_tag!r} -> {new_tag!r}",
+                      flush=True,
+                  )
+                  break
+
+              if not image_block_found:
+                  raise SystemExit(
+                      f"{path}에서 top-level image 블록을 찾지 못했습니다."
+                  )
+
+              if not tag_updated:
+                  raise SystemExit(
+                      f"{path}의 top-level image 블록에서 tag를 찾지 못했습니다."
+                  )
+
+              path.write_text("".join(lines), encoding="utf-8")
+
+          for value_file in value_files:
+              print(f"Processing {value_file}...", flush=True)
+              update_top_level_image_tag(value_file, version)
+
+          print("All image tags updated.", flush=True)
           PY
 
           echo "Updated image values:"
+
           grep -A4 '^image:' ktb-board-spring/values.yaml
           grep -A4 '^image:' ktb-board-express/values.yaml
+
+          echo "Changed files:"
+          git status --short
 
       - name: Validate GitOps Helm charts
         shell: bash
