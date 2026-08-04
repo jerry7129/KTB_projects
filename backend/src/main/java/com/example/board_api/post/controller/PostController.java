@@ -114,4 +114,39 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.of("CREATE_SUCCESS", "댓글 생성을 성공했습니다.", responseDto));
     }
+
+    // 특정 게시글 댓글 목록 조회 (커서 기반 paging)
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentListCursorResponseDto>> getComments(
+            @PathVariable("postId") Long postId,
+            @RequestParam(required = false) Long startingAfter,
+            @RequestParam(defaultValue = "10") Integer limit
+    ) {
+        CommentListCursorResponseDto responseDto = commentService.getComments(postId, startingAfter, limit);
+        return ResponseEntity.ok(ApiResponse.of("GET_SUCCESS", "댓글 목록 조회를 성공했습니다.", responseDto));
+    }
+
+    // 특정 게시글 댓글 수정
+    @PatchMapping("/{postId}/comments/{commentId}")
+    public ResponseEntity<ApiResponse<CommentResponseDto>> updateComment(
+            @AuthenticationPrincipal Integer userId,
+            @PathVariable("postId") Long postId,
+            @PathVariable("commentId") Long commentId,
+            @RequestBody CommentRequestDto requestDto
+    ) {
+        CommentResponseDto responseDto = commentService.updateComment(userId, postId, commentId, requestDto);
+        return ResponseEntity.ok(ApiResponse.of("UPDATE_SUCCESS", "댓글 수정을 성공했습니다.", responseDto));
+    }
+
+    // 특정 게시글 댓글 삭제
+    @DeleteMapping("/{postId}/comments/{commentId}")
+    public ResponseEntity<ApiResponse<Void>> deleteComment(
+            @AuthenticationPrincipal Integer userId,
+            @PathVariable("postId") Long postId,
+            @PathVariable("commentId") Long commentId
+    ) {
+        commentService.deleteComment(userId, postId, commentId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(ApiResponse.of("DELETE_SUCCESS", "댓글 삭제를 성공했습니다.", null));
+    }
 }

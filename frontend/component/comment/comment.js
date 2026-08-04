@@ -16,9 +16,9 @@ const CommentItem = (data, writerId, postId, commentId) => {
                     Dialog('삭제 실패', '댓글 삭제에 실패하였습니다.');
                     return;
                 }
-
-                if (status === HTTP_OK)
+                if (ok) {
                     location.href = '/html/board.html?id=' + postId;
+                }
             },
         );
     };
