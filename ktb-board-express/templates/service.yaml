@@ -6,7 +6,6 @@ metadata:
 
   labels:
     {{- include "ktb-board-express.labels" . | nindent 4 }}
-    monitoring.ktb-board/component: express
 
   {{- with .Values.service.annotations }}
   annotations:

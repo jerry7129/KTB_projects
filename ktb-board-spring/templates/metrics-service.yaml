@@ -1,0 +1,18 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ktb-board-spring.fullname" . }}-metrics
+  labels:
+    {{- include "ktb-board-spring.labels" . | nindent 4 }}
+    monitoring.ktb-board/component: spring
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "ktb-board-spring.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: {{ .Values.container.managementPortName }}
+      protocol: TCP
+      port: {{ .Values.container.managementPort }}
+      targetPort: {{ .Values.container.managementPortName }}
+{{- end }}

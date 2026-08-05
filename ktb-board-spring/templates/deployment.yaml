@@ -45,6 +45,9 @@ spec:
             - name: {{ .Values.container.portName }}
               containerPort: {{ .Values.container.port }}
               protocol: TCP
+            - name: {{ .Values.container.managementPortName }}
+              containerPort: {{ .Values.container.managementPort }}
+              protocol: TCP
 
           envFrom:
             {{- if .Values.config.create }}

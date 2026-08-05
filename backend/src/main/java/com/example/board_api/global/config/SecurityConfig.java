@@ -39,7 +39,9 @@ public class SecurityConfig {
             "/public/**",
             "/users/temp-profile-image",
             "/token",
-            "/health"
+            "/health",
+            "/actuator/prometheus",
+            "/actuator/health/**"
     };
 
     @Bean
