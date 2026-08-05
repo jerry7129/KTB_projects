@@ -128,7 +128,7 @@ const changeEventHandler = async (event, uid) => {
 
             // 파일 업로드를 위한 POST 요청 실행
             try {
-                const { ok, data } = await requestJson(
+                const { ok, status, data, body } = await requestJson(
                     `${getServerUrl()}/users/me/profile-image`,
                     {
                         method: 'POST',
@@ -136,7 +136,11 @@ const changeEventHandler = async (event, uid) => {
                     },
                 );
 
-                if (!ok) throw new Error('서버 응답 오류');
+                if (!ok) {
+                    throw new Error(
+                        body?.message || `서버 응답 오류 (HTTP ${status})`,
+                    );
+                }
                 localStorage.setItem(
                     'profileImageUrl',
                     data.fileUrl,

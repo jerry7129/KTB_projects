@@ -115,7 +115,7 @@ jobs:
             fi
 
             # CI, Compose, 배포 설정은 두 컴포넌트에 공통 영향을 줄 수 있다.
-            COMMON_PATTERN='^(\.github/workflows/build-main-candidate\.ya?ml$|(docker-)?compose(\.[^/]*)?\.ya?ml$|deploy/|scripts/deploy/)'
+            COMMON_PATTERN='^(\.github/workflows/build-main-candidates\.ya?ml$|(docker-)?compose(\.[^/]*)?\.ya?ml$|deploy/|scripts/deploy/)'
 
             if grep -Eq "${COMMON_PATTERN}" <<< "${CHANGED_FILES}"; then
               BACKEND_CHANGED=true
