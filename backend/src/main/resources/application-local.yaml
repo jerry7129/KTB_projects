@@ -21,6 +21,7 @@ server:
 
 file:
   upload-dir: /Users/ktb_ksg/IdeaProjects/KTB_projects/week2/ImageStorage
+  storage: local
 
 jwt:
   secret: ${JWT_SECRET}

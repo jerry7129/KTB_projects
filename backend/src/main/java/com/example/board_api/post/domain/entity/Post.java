@@ -15,6 +15,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import com.example.board_api.global.util.FileUtil;
 
 import static lombok.AccessLevel.PROTECTED;
 
@@ -73,7 +74,7 @@ public class Post {
     public List<String> getPostImageUris() {
         List<String> postImageUris = new ArrayList<>();
         for(PostImage postImage : postImages) {
-            postImageUris.add("/public/" + postImage.getFileKey());
+            postImageUris.add(FileUtil.toPublicImageUrl(postImage.getFileKey()));
         }
         return postImageUris;
     }

@@ -16,8 +16,6 @@ public class ImageUploadResponseDto {
     }
 
     public static ImageUploadResponseDto from(String fileKey) {
-        // DB의 상대 경로(/public/...) 반환
-        String url = "/public/" + fileKey;
-        return of(url);
+        return of(FileUtil.toPublicImageUrl(fileKey));
     }
 }

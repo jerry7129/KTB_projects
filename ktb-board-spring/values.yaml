@@ -10,12 +10,6 @@ nameOverride: ""
 fullnameOverride: ""
 environment: prod
 
-serviceAccount:
-  create: false
-  automount: false
-  annotations: {}
-  name: ""
-
 podAnnotations: {}
 podLabels: {}
 
@@ -47,6 +41,9 @@ config:
   create: true
   data:
     SPRING_PROFILES_ACTIVE: "prod"
+    AWS_REGION: "ap-northeast-2"
+    S3_BUCKET: "ktb-board-s3-180294193538-ap-northeast-2-an"
+    CLOUDFRONT_BASE_URL: "https://d2rrn7nnlaxdl3.cloudfront.net"
 
 secret:
   create: false
@@ -167,9 +164,14 @@ serviceAccount:
 
   annotations: {}
 
-  # Spring 애플리케이션이 Kubernetes API를 사용하지 않으므로
-  # ServiceAccount Token을 Pod에 마운트하지 않음
   automount: false
+
+  webIdentity:
+    enabled: true
+    roleArn: arn:aws:iam::180294193538:role/KTB-Board-Spring-S3-Role
+    audience: sts.amazonaws.com
+    expirationSeconds: 3600
+    tokenPath: /var/run/secrets/aws/token
 
 autoscaling:
   enabled: true

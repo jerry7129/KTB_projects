@@ -49,6 +49,21 @@ spec:
               containerPort: {{ .Values.container.managementPort }}
               protocol: TCP
 
+          {{- if .Values.serviceAccount.webIdentity.enabled }}
+          env:
+            - name: AWS_ROLE_ARN
+              value: {{ required "serviceAccount.webIdentity.roleArn 값을 지정해야 합니다." .Values.serviceAccount.webIdentity.roleArn | quote }}
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: {{ .Values.serviceAccount.webIdentity.tokenPath | quote }}
+            - name: AWS_ROLE_SESSION_NAME
+              value: ktb-board-spring
+
+          volumeMounts:
+            - name: aws-web-identity-token
+              mountPath: /var/run/secrets/aws
+              readOnly: true
+          {{- end }}
+
           envFrom:
             {{- if .Values.config.create }}
             - configMapRef:
@@ -92,3 +107,14 @@ spec:
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
+      {{- if .Values.serviceAccount.webIdentity.enabled }}
+      volumes:
+        - name: aws-web-identity-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: {{ .Values.serviceAccount.webIdentity.audience | quote }}
+                  expirationSeconds: {{ .Values.serviceAccount.webIdentity.expirationSeconds }}
+                  path: token
+      {{- end }}

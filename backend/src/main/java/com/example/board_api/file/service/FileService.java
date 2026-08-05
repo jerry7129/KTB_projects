@@ -9,7 +9,8 @@ import com.example.board_api.global.exception.InvalidFileException;
 import com.example.board_api.global.util.FileUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.parameters.P;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +24,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Slf4j
 @Service
@@ -35,10 +42,22 @@ public class FileService {
     private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif"); // 허용할 확장자 목록
     private static ProfileImageRepository profileImageRepository;
     private static PostImageRepository postImageRepository;
+    private final S3Client s3Client;
+    private final String storageType;
+    private final String bucketName;
 
-    public FileService(ProfileImageRepository profileImageRepository, PostImageRepository postImageRepository) {
+    public FileService(
+            ProfileImageRepository profileImageRepository,
+            PostImageRepository postImageRepository,
+            ObjectProvider<S3Client> s3ClientProvider,
+            @Value("${file.storage:local}") String storageType,
+            @Value("${file.s3.bucket:}") String bucketName
+    ) {
         FileService.profileImageRepository = profileImageRepository;
         FileService.postImageRepository = postImageRepository;
+        this.s3Client = s3ClientProvider.getIfAvailable();
+        this.storageType = storageType;
+        this.bucketName = bucketName;
     }
 
     // ============= 이미지 업로드 (프로필, 게시글 사진) ===============
@@ -82,9 +101,15 @@ public class FileService {
 
         // id가 null일 때는 임시 저장이므로 temp 디렉토리를 사용
         String directoryName = (id == null) ? "temp" : prefix + "/" + id;
+        String fileKey = directoryName + "/" + filename;
+
+        if (isS3Storage()) {
+            uploadToS3(file, fileKey);
+            return fileKey;
+        }
+
         Path directoryPath = FILE_DIR.resolve(directoryName);
         Path savePath = directoryPath.resolve(filename);
-
         try {
             if (!Files.exists(directoryPath)) {
                 Files.createDirectories(directoryPath);
@@ -98,8 +123,6 @@ public class FileService {
         // 웹 URL 경로: /public/{directoryName}/{filename}
         // 하지만, DB에는 /public/을 뺀 경로만 저장한다.
         // AWS S3로 확장을 대비해 Object key로 저장하는 것.
-        String fileKey = directoryName + "/" + filename; 
-
         return fileKey;
     }
 
@@ -108,10 +131,23 @@ public class FileService {
         if (fileKey == null || fileKey.isBlank()) return;
         if (fileKey.equals("profile/default-profile.png")) return;
 
+        String normalizedKey = FileUtil.toFileKey(fileKey);
+        if (isS3Storage()) {
+            try {
+                s3Client.deleteObject(DeleteObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(normalizedKey)
+                        .build());
+            } catch (S3Exception e) {
+                log.warn("S3 파일 삭제 실패 (무시): bucket={}, key={}", bucketName, normalizedKey, e);
+            }
+            return;
+        }
+
         try {
             // /public/profile/{userId}/{fileName} -> {userId}/{fileName} 상대 경로 변환 과정.
             // 실제 로컬 저장 경로는 PROJECT_ROOT/uploads/profile/{userId}/{fileName} 이다.
-            String relativePath = fileKey.replace(FILE_URL + "/", "");
+            String relativePath = normalizedKey.replace(FILE_URL + "/", "");
             Path filePath = FILE_DIR.resolve(relativePath).normalize();
             // normalize()는 Path의 ../ 나 ./ 같이 위험한 경로를 없앤다.
             // 이로 인해 악의적 API 조작을 방지한다.
@@ -138,7 +174,7 @@ public class FileService {
     }
 
     public PostImage updatePostImage(String oldImageUrl, MultipartFile newFile, Long userId) {
-        String fileKey = update(oldImageUrl, newFile, "profile", userId);
+        String fileKey = update(oldImageUrl, newFile, "post", userId);
         return new PostImage(fileKey);
     }
 
@@ -159,8 +195,7 @@ public class FileService {
 
         // DB에서 임시 프로필 이미지 있는 지 찾기
         // URL로 왔을 경우, 상대 주소로 바꾸고 공통으로 붙는 /public/을 지워 fileKey 로 만든다.
-        String extractedPath = FileUtil.extractPathFromUrl(tempImageUrl);
-        String oldFileKey = extractedPath.replaceFirst("^/?public/", "");
+        String oldFileKey = FileUtil.toFileKey(tempImageUrl);
 
         ProfileImage file = profileImageRepository.findByFileKey(oldFileKey)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -177,8 +212,7 @@ public class FileService {
     public PostImage moveTempToPost(String tempImageUrl, Long postId) {
         if (tempImageUrl == null || tempImageUrl.isBlank()) return null;
 
-        String extractedPath = FileUtil.extractPathFromUrl(tempImageUrl);
-        String oldFileKey = extractedPath.replaceFirst("^/?public/", "");
+        String oldFileKey = FileUtil.toFileKey(tempImageUrl);
 
         PostImage file = postImageRepository.findByFileKey(oldFileKey)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "임시 이미지를 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
@@ -192,6 +226,27 @@ public class FileService {
     }
 
     private String moveFile(String oldFileKey, String newPrefix, Long targetId) {
+        String filename = oldFileKey.substring(oldFileKey.lastIndexOf('/') + 1);
+        String newFileKey = newPrefix + "/" + targetId + "/" + filename;
+
+        if (isS3Storage()) {
+            try {
+                s3Client.copyObject(CopyObjectRequest.builder()
+                        .copySource(bucketName + "/" + oldFileKey)
+                        .destinationBucket(bucketName)
+                        .destinationKey(newFileKey)
+                        .build());
+                s3Client.deleteObject(DeleteObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(oldFileKey)
+                        .build());
+                return newFileKey;
+            } catch (S3Exception e) {
+                log.error("S3 파일 이동 실패: {} -> {}", oldFileKey, newFileKey, e);
+                throw new BusinessException("INTERNAL_SERVER_ERROR", "파일 이동에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
         // 로컬 저장소의 현재 임시 파일 저장 경로 계산
         Path oldPath = FILE_DIR.resolve(oldFileKey).normalize();
         
@@ -213,6 +268,31 @@ public class FileService {
         }
         
         return newDirectory + "/" + oldPath.getFileName().toString();
+    }
+
+    private void uploadToS3(MultipartFile file, String fileKey) {
+        try {
+            PutObjectRequest request = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .contentType(file.getContentType())
+                    .contentLength(file.getSize())
+                    .build();
+            s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        } catch (IOException | S3Exception e) {
+            log.error("S3 파일 업로드 실패: bucket={}, key={}", bucketName, fileKey, e);
+            throw new BusinessException("INTERNAL_SERVER_ERROR", "파일 저장을 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private boolean isS3Storage() {
+        if (!"s3".equalsIgnoreCase(storageType)) {
+            return false;
+        }
+        if (s3Client == null || bucketName == null || bucketName.isBlank()) {
+            throw new IllegalStateException("S3 저장소 설정이 올바르지 않습니다.");
+        }
+        return true;
     }
 
     // ========== Private Methods ==========

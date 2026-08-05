@@ -9,6 +9,10 @@ import java.net.URISyntaxException;
 
 public class FileUtil {
 
+    private static final String CLOUDFRONT_BASE_URL = normalizeBaseUrl(
+            System.getenv("CLOUDFRONT_BASE_URL")
+    );
+
     // 인스턴스화 방지
     private FileUtil() {
         throw new BusinessException("INTERNAL_SERVER_ERROR", "서버 내부의 오류가 있습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -53,6 +57,44 @@ public class FileUtil {
                 .toUriString();
 
         return baseUrl + relativePath;
+    }
+
+    public static String toPublicImageUrl(String fileKey) {
+        if (fileKey == null || fileKey.isBlank()) {
+            return null;
+        }
+        if (fileKey.startsWith("http://") || fileKey.startsWith("https://")) {
+            return fileKey;
+        }
+        String normalizedKey = fileKey.replaceFirst("^/?public/", "").replaceFirst("^/", "");
+        if (CLOUDFRONT_BASE_URL != null) {
+            return CLOUDFRONT_BASE_URL + "/" + normalizedKey;
+        }
+        return "/public/" + normalizedKey;
+    }
+
+    public static String toFileKey(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        String path = imageUrl.startsWith("http://") || imageUrl.startsWith("https://")
+                ? extractPathFromUrl(imageUrl)
+                : imageUrl;
+        if (path == null) {
+            return null;
+        }
+        return path.replaceFirst("^/?public/", "").replaceFirst("^/", "");
+    }
+
+    private static String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return null;
+        }
+        String normalized = baseUrl.trim();
+        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+            normalized = "https://" + normalized;
+        }
+        return normalized.replaceFirst("/+$", "");
     }
 
     // 바이트 단위를 읽기 쉬운 단위(KB, MB 등)로 변환

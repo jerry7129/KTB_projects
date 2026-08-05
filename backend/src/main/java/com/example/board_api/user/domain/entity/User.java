@@ -4,6 +4,7 @@ import com.example.board_api.file.domain.entity.ProfileImage;
 import com.example.board_api.post.domain.entity.Post;
 import com.example.board_api.user.domain.UserRole;
 import com.example.board_api.user.domain.UserStatus;
+import com.example.board_api.global.util.FileUtil;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -83,9 +84,9 @@ public class User {
     // 프로필 이미지 Uri 가져오기
     public String getProfileImageUris() {
         if (this.profileImages == null || this.profileImages.isEmpty()) {
-            return "/public/profile/default-profile.png";
+            return FileUtil.toPublicImageUrl("profile/default-profile.png");
         }
-        return "/public/" + this.getProfileImages().getLast().getFileKey();
+        return FileUtil.toPublicImageUrl(this.getProfileImages().getLast().getFileKey());
     }
 
     // ============ 연관 관계 편의 메소드 ===========

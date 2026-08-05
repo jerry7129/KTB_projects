@@ -119,8 +119,7 @@ public class PostService {
         if (imageUrl == null || imageUrl.isBlank()) {
             return null;
         }
-        String extractedPath = FileUtil.extractPathFromUrl(imageUrl);
-        String fileKey = extractedPath.replaceFirst("^/?public/", "");
+        String fileKey = FileUtil.toFileKey(imageUrl);
 
         return postImageRepository.findByFileKey(fileKey)
                 .orElseThrow(() -> new NotFoundException("POST_IMAGE_NOT_FOUND"));

@@ -184,8 +184,7 @@ public class UserService {
         }
 
         // 1. 전체 URL에서 도메인을 떼고 상대 경로만 추출
-        String relativePath = FileUtil.extractPathFromUrl(profileImageUrl);
-        String fileKey = relativePath.replaceFirst("^/?public/", "");
+        String fileKey = FileUtil.toFileKey(profileImageUrl);
 
         // 2. 추출된 상대 경로로 DB 조회 -> 키로 바꿈.
         return profileImageRepository.findByFileKey(fileKey)
