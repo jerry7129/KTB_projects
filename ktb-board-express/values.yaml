@@ -7,7 +7,7 @@ fullnameOverride: ""
 
 image:
   repository: 180294193538.dkr.ecr.ap-northeast-2.amazonaws.com/ktb-board-express
-  tag: v1.0.3
+  tag: v1.0.6
   pullPolicy: IfNotPresent
 
 # Worker의 ECR Credential Provider를 사용하므로 비워 둠
