@@ -70,6 +70,9 @@ spec:
             - name: {{ .Values.container.portName | quote }}
               containerPort: {{ .Values.container.port }}
               protocol: TCP
+            - name: {{ .Values.container.metricsPortName | quote }}
+              containerPort: {{ .Values.container.metricsPort }}
+              protocol: TCP
 
           {{- if .Values.config.create }}
           envFrom:

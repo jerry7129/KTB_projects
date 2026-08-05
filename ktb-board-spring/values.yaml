@@ -31,6 +31,8 @@ container:
   name: spring-container
   port: 8080
   portName: http
+  managementPort: 9090
+  managementPortName: metrics
 
 service:
   type: NodePort
@@ -222,8 +224,8 @@ autoscaling:
 serviceMonitor:
   enabled: true
   componentLabel: spring
-  port: http
-  path: /api/actuator/prometheus
+  port: metrics
+  path: /actuator/prometheus
   interval: 30s
   scrapeTimeout: 10s
 

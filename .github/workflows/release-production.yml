@@ -148,14 +148,19 @@ jobs:
           set -Eeuo pipefail
 
           REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          CANDIDATE_KEY="${MANIFEST_PREFIX}/candidates/${COMMIT_SHA}.json"
 
           if ! aws s3 cp \
             "${CANDIDATE_URI}" \
+            --key "${CANDIDATE_KEY}" \
             /tmp/candidate.json \
             --only-show-errors; then
 
-            echo "::error::Candidate manifest가 없습니다."
-            echo "::error::Build Main Candidate Workflow를 먼저 확인하세요."
+            echo "::error::Candidate manifest를 읽지 못했습니다."
+            echo "::error::객체 부재 또는 IAM/S3/KMS 접근 권한을 확인하세요."
+            echo "::error::Bucket: ${MANIFEST_BUCKET}"
+            echo "::error::Key: ${CANDIDATE_KEY}"
+            echo "::error::Commit: ${COMMIT_SHA}"
             exit 1
           fi
 

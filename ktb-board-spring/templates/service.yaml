@@ -5,7 +5,6 @@ metadata:
   name: {{ include "ktb-board-spring.fullname" . }}-service
   labels:
     {{- include "ktb-board-spring.labels" . | nindent 4 }}
-    monitoring.ktb-board/component: spring
 
   {{- with .Values.service.annotations }}
   annotations:
